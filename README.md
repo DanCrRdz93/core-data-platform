@@ -470,31 +470,49 @@ sequenceDiagram
     participant R as Repository
     participant DS as DataSource
     participant E as Executor
-    participant I as Interceptors
+    participant RI as Request<br/>Interceptors
     participant H as HttpEngine
+    participant RsI as Response<br/>Interceptors
     participant V as Validator
     participant CL as Classifier
 
     C->>R: getUsers()
     R->>DS: fetchUsers()
     DS->>E: execute(HttpRequest, deserialize)
-    E->>I: RequestInterceptor chain (auth, tracing)
-    I-->>E: Modified HttpRequest
-    E->>H: execute(request)
-    H-->>E: RawResponse
-    E->>I: ResponseInterceptor chain (logging)
-    I-->>E: RawResponse
-    E->>V: validate(response)
-    alt Valid (2xx)
-        V-->>E: Valid
-        E->>E: deserialize(response) → T
-        E-->>DS: Success(data, metadata)
-    else Invalid (non-2xx)
-        V-->>E: Invalid
-        E->>CL: classify(response)
-        CL-->>E: NetworkError
-        E-->>DS: Failure(error)
+
+    rect rgb(245, 245, 245)
+        Note over E,RI: ① Pre-transport
+        E->>RI: intercept(request, context)
+        RI-->>E: Modified HttpRequest
     end
+
+    rect rgb(240, 248, 255)
+        Note over E,H: ② Transport
+        E->>H: execute(request)
+        H-->>E: RawResponse
+    end
+
+    rect rgb(245, 245, 245)
+        Note over E,RsI: ③ Post-transport
+        E->>RsI: intercept(response, request)
+        RsI-->>E: RawResponse
+    end
+
+    rect rgb(255, 243, 224)
+        Note over E,CL: ④ Validate & Classify
+        E->>V: validate(response)
+        alt Valid (2xx)
+            V-->>E: Valid
+            E->>E: deserialize(response) → T
+            E-->>DS: Success(data, metadata)
+        else Invalid (non-2xx)
+            V-->>E: Invalid
+            E->>CL: classify(response)
+            CL-->>E: NetworkError
+            E-->>DS: Failure(error)
+        end
+    end
+
     DS-->>R: NetworkResult&lt;UserDto&gt;
     R->>R: .map(UserMapper::toDomain)
     R-->>C: NetworkResult&lt;User&gt;
@@ -829,21 +847,29 @@ val loggingInterceptor = ResponseInterceptor { response, request, context ->
 ### Grafo de Dependencias de Módulos
 
 ```mermaid
-graph TD
+graph LR
     APP[":app"]
     SA[":sample-api"]
-    NK[":network-ktor"]
-    NC[":network-core"]
-    SC[":security-core"]
+
+    subgraph SDK["SDK Modules"]
+        direction TB
+        NK[":network-ktor"]
+        NC[":network-core"]
+        SC[":security-core"]
+    end
 
     APP --> SA
     APP --> NK
     APP --> SC
+
     SA --> NC
     SA --> NK
     SA --> SC
-    NK --> NC
 
+    NK --> NC
+    NK -.-> SC
+
+    style SDK fill:#fafafa,stroke:#9e9e9e
     style NC fill:#e1f5fe,stroke:#0277bd
     style SC fill:#fce4ec,stroke:#c62828
     style NK fill:#e8f5e9,stroke:#2e7d32
@@ -854,8 +880,9 @@ graph TD
 ### Distribución de Source Sets KMP
 
 ```mermaid
-graph LR
+graph TD
     subgraph commonMain["commonMain (95%+ of code)"]
+        direction LR
         A[Interfaces & Contracts]
         B[Sealed Classes & Data Models]
         C[Default Implementations]
@@ -863,20 +890,25 @@ graph LR
         E[Error Taxonomy]
     end
 
-    subgraph androidMain["androidMain"]
-        F[AndroidSecretStore]
-        G[AndroidStoreConfig]
+    subgraph platformSets["Platform Source Sets"]
+        direction LR
+        subgraph androidMain["androidMain"]
+            F[AndroidSecretStore]
+            G[AndroidStoreConfig]
+            H[PlatformHttpClient.android]
+        end
+
+        subgraph iosMain["iosMain"]
+            I[IosSecretStore]
+            J[KeychainConfig]
+            K[PlatformHttpClient.ios]
+        end
     end
 
-    subgraph iosMain["iosMain"]
-        H[IosSecretStore]
-        I[KeychainConfig]
-    end
-
-    commonMain --> androidMain
-    commonMain --> iosMain
+    commonMain --> platformSets
 
     style commonMain fill:#e3f2fd,stroke:#1565c0
+    style platformSets fill:#fafafa,stroke:#9e9e9e
     style androidMain fill:#e8f5e9,stroke:#2e7d32
     style iosMain fill:#fff3e0,stroke:#ef6c00
 ```
@@ -884,29 +916,31 @@ graph LR
 ### Integración Network ↔ Security
 
 ```mermaid
-graph LR
-    subgraph security-core
+graph TD
+    subgraph security-core["security-core"]
+        direction LR
         CP[CredentialProvider]
         CHM[CredentialHeaderMapper]
         CR[Credential]
-        CP --> CR
-        CHM --> CR
-    end
-
-    subgraph network-core
-        RI[RequestInterceptor]
-        HR[HttpRequest]
-        RI --> HR
+        CP -->|"current()"| CR
+        CHM -->|"toHeaders()"| CR
     end
 
     subgraph consumer["Domain Module (e.g. sample-api)"]
         AI[Auth Interceptor]
-        AI -->|"calls"| CP
-        AI -->|"calls"| CHM
-        AI -->|"implements"| RI
     end
 
-    CHM -->|"returns Map&lt;String,String&gt;"| AI
+    subgraph network-core["network-core"]
+        direction LR
+        RI[RequestInterceptor]
+        HR[HttpRequest]
+        RI -->|"modifies"| HR
+    end
+
+    AI -->|"1. calls current()"| CP
+    AI -->|"2. calls toHeaders()"| CHM
+    CHM -.->|"Map&lt;String,String&gt;"| AI
+    AI -->|"3. implements"| RI
 
     style security-core fill:#fce4ec,stroke:#c62828
     style network-core fill:#e1f5fe,stroke:#0277bd

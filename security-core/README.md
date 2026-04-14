@@ -234,61 +234,67 @@ security-core/src/
 ### Separación por Preocupación
 
 ```mermaid
-graph TD
-    subgraph "Credential Management"
+graph LR
+    subgraph credentials["Credential Management"]
+        direction TB
         CR[Credential]
         CP[CredentialProvider]
         CHM[CredentialHeaderMapper]
+        CP --> CR
+        CHM --> CR
     end
 
-    subgraph "Session Lifecycle"
+    subgraph session["Session Lifecycle"]
+        direction TB
         SC[SessionController]
         SS[SessionState]
         SE[SessionEvent]
         SCR[SessionCredentials]
+        SC --> SS
+        SC --> SE
+        SC --> SCR
     end
 
-    subgraph "Secure Storage"
+    subgraph storage["Secure Storage"]
+        direction TB
         STO[SecretStore]
         AS[AndroidSecretStore]
         IS[IosSecretStore]
+        AS -->|implements| STO
+        IS -->|implements| STO
     end
 
-    subgraph "Trust & TLS"
+    subgraph trust["Trust & TLS"]
+        direction TB
         TP[TrustPolicy]
         TE[TrustEvaluation]
         PIN[CertificatePin]
     end
 
-    subgraph "Log Protection"
+    subgraph logging["Log Protection"]
+        direction TB
         LS[LogSanitizer]
         DLS[DefaultLogSanitizer]
         CFG[SecurityConfig]
+        DLS --> CFG
     end
 
-    SC --> SS
-    SC --> SE
-    SC --> SCR
     SCR --> CR
     SS --> CR
-    CP --> CR
-    CHM --> CR
-    DLS --> CFG
-    AS -->|implements| STO
-    IS -->|implements| STO
 
-    style CR fill:#e1f5fe,stroke:#0277bd
-    style STO fill:#e8f5e9,stroke:#2e7d32
-    style SC fill:#fff3e0,stroke:#ef6c00
-    style TP fill:#fce4ec,stroke:#c62828
-    style LS fill:#f3e5f5,stroke:#7b1fa2
+    style credentials fill:#e1f5fe,stroke:#0277bd
+    style session fill:#fff3e0,stroke:#ef6c00
+    style storage fill:#e8f5e9,stroke:#2e7d32
+    style trust fill:#fce4ec,stroke:#c62828
+    style logging fill:#f3e5f5,stroke:#7b1fa2
 ```
 
 ### Distribución de Source Sets de Plataforma
 
 ```mermaid
-graph LR
+graph TD
     subgraph commonMain["commonMain (all contracts)"]
+        direction LR
         A[SecretStore interface]
         B[Credential / CredentialProvider]
         C[SessionController]
@@ -298,20 +304,24 @@ graph LR
         G[Base64 utility]
     end
 
-    subgraph androidMain
-        H["AndroidSecretStore<br/>(EncryptedSharedPreferences)"]
-        I[AndroidStoreConfig]
+    subgraph platformSets["Platform Source Sets"]
+        direction LR
+        subgraph androidMain["androidMain"]
+            H["AndroidSecretStore<br/><i>EncryptedSharedPreferences</i>"]
+            I[AndroidStoreConfig]
+        end
+
+        subgraph iosMain["iosMain"]
+            J["IosSecretStore<br/><i>Keychain Services</i>"]
+            K["KeychainConfig<br/>+ KeychainAccessibility"]
+        end
     end
 
-    subgraph iosMain
-        J["IosSecretStore<br/>(Keychain Services)"]
-        K["KeychainConfig<br/>+ KeychainAccessibility"]
-    end
-
-    A --> H
-    A --> J
+    A -->|implements| H
+    A -->|implements| J
 
     style commonMain fill:#e3f2fd,stroke:#1565c0
+    style platformSets fill:#fafafa,stroke:#9e9e9e
     style androidMain fill:#e8f5e9,stroke:#2e7d32
     style iosMain fill:#fff3e0,stroke:#ef6c00
 ```

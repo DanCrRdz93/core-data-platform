@@ -11,78 +11,89 @@ Cómo las interfaces principales, sealed classes e implementaciones se relaciona
 
 ```mermaid
 classDiagram
-    direction TB
+    direction LR
 
-    class SafeRequestExecutor {
-        <<interface>>
-        +execute(request, context?, deserialize) NetworkResult~T~
+    namespace Executor {
+        class SafeRequestExecutor {
+            <<interface>>
+            +execute(request, context?, deserialize) NetworkResult~T~
+        }
+
+        class DefaultSafeRequestExecutor {
+            -engine: HttpEngine
+            -config: NetworkConfig
+            -validator: ResponseValidator
+            -classifier: ErrorClassifier
+            -interceptors: List~RequestInterceptor~
+            -responseInterceptors: List~ResponseInterceptor~
+            -observers: List~NetworkEventObserver~
+            +execute(request, context?, deserialize) NetworkResult~T~
+        }
     }
 
-    class DefaultSafeRequestExecutor {
-        -engine: HttpEngine
-        -config: NetworkConfig
-        -validator: ResponseValidator
-        -classifier: ErrorClassifier
-        -interceptors: List~RequestInterceptor~
-        -responseInterceptors: List~ResponseInterceptor~
-        -observers: List~NetworkEventObserver~
-        +execute(request, context?, deserialize) NetworkResult~T~
+    namespace Transport {
+        class HttpEngine {
+            <<interface>>
+            +execute(request) RawResponse
+            +close()
+            +healthCheck() Boolean
+        }
+
+        class KtorHttpEngine {
+            -client: HttpClient
+            +execute(request) RawResponse
+            +close()
+            +create(config, trustPolicy?)$ KtorHttpEngine
+        }
     }
 
-    class HttpEngine {
-        <<interface>>
-        +execute(request) RawResponse
-        +close()
+    namespace Interceptors {
+        class RequestInterceptor {
+            <<fun interface>>
+            +intercept(request, context?) HttpRequest
+        }
+
+        class ResponseInterceptor {
+            <<fun interface>>
+            +intercept(response, request, context?) RawResponse
+        }
     }
 
-    class KtorHttpEngine {
-        -client: HttpClient
-        +execute(request) RawResponse
-        +close()
-        +create(config)$ KtorHttpEngine
+    namespace Validation {
+        class ErrorClassifier {
+            <<interface>>
+            +classify(response?, cause?) NetworkError
+        }
+
+        class DefaultErrorClassifier {
+            <<open>>
+            +classify(response?, cause?) NetworkError
+            #classifyThrowable(cause) NetworkError
+            #classifyResponse(response) NetworkError
+        }
+
+        class KtorErrorClassifier {
+            #classifyThrowable(cause) NetworkError
+        }
+
+        class ResponseValidator {
+            <<interface>>
+            +validate(response) ValidationOutcome
+        }
+
+        class DefaultResponseValidator {
+            +validate(response) ValidationOutcome
+        }
     }
 
-    class RequestInterceptor {
-        <<fun interface>>
-        +intercept(request, context?) HttpRequest
-    }
-
-    class ResponseInterceptor {
-        <<fun interface>>
-        +intercept(response, request, context?) RawResponse
-    }
-
-    class ErrorClassifier {
-        <<interface>>
-        +classify(response?, cause?) NetworkError
-    }
-
-    class DefaultErrorClassifier {
-        <<open>>
-        +classify(response?, cause?) NetworkError
-        #classifyThrowable(cause) NetworkError
-        #classifyResponse(response) NetworkError
-    }
-
-    class KtorErrorClassifier {
-        #classifyThrowable(cause) NetworkError
-    }
-
-    class ResponseValidator {
-        <<interface>>
-        +validate(response) ValidationOutcome
-    }
-
-    class DefaultResponseValidator {
-        +validate(response) ValidationOutcome
-    }
-
-    class NetworkEventObserver {
-        <<interface>>
-        +onRequestStarted(request, context?)
-        +onResponseReceived(request, response, durationMs, context?)
-        +onRetryScheduled(request, attempt, max, error, delayMs)
-        +onRequestFailed(request, error, durationMs, context?)
+    namespace Observability {
+        class NetworkEventObserver {
+            <<interface>>
+            +onRequestStarted(request, context?)
+            +onResponseReceived(request, response, durationMs, context?)
+            +onRetryScheduled(request, attempt, max, error, delayMs)
+            +onRequestFailed(request, error, durationMs, context?)
+        }
     }
 
     SafeRequestExecutor <|.. DefaultSafeRequestExecutor
@@ -110,66 +121,79 @@ classDiagram
 
 ```mermaid
 classDiagram
-    direction TB
+    direction LR
 
-    class NetworkResult~T~ {
-        <<sealed>>
-        +isSuccess: Boolean
-        +isFailure: Boolean
-        +map(transform) NetworkResult~R~
-        +flatMap(transform) NetworkResult~R~
-        +fold(onSuccess, onFailure) R
-        +onSuccess(action) NetworkResult~T~
-        +onFailure(action) NetworkResult~T~
-        +getOrNull() T?
-        +errorOrNull() NetworkError?
+    namespace Result {
+        class NetworkResult~T~ {
+            <<sealed>>
+            +isSuccess: Boolean
+            +isFailure: Boolean
+            +map(transform) NetworkResult~R~
+            +flatMap(transform) NetworkResult~R~
+            +fold(onSuccess, onFailure) R
+            +onSuccess(action) NetworkResult~T~
+            +onFailure(action) NetworkResult~T~
+            +getOrNull() T?
+            +errorOrNull() NetworkError?
+        }
+
+        class Success~T~ {
+            +data: T
+            +metadata: ResponseMetadata
+        }
+
+        class Failure {
+            +error: NetworkError
+        }
+
+        class ResponseMetadata {
+            +statusCode: Int
+            +headers: Map
+            +durationMs: Long
+            +requestId: String?
+            +attemptCount: Int
+        }
     }
 
-    class Success~T~ {
-        +data: T
-        +metadata: ResponseMetadata
+    namespace ErrorModel {
+        class NetworkError {
+            <<sealed>>
+            +message: String
+            +diagnostic: Diagnostic?
+            +isRetryable: Boolean
+        }
+
+        class Diagnostic {
+            +description: String
+            +cause: Throwable?
+            +metadata: Map
+        }
     }
 
-    class Failure {
-        +error: NetworkError
+    namespace TransportErrors {
+        class Connectivity { +isRetryable = true }
+        class Timeout { +isRetryable = true }
+        class Cancelled { +isRetryable = false }
     }
 
-    class ResponseMetadata {
-        +statusCode: Int
-        +headers: Map
-        +durationMs: Long
-        +requestId: String?
-        +attemptCount: Int
+    namespace HttpErrors {
+        class Authentication { +isRetryable = false }
+        class Authorization { +isRetryable = false }
+        class ClientError { +statusCode: Int }
+        class ServerError { +statusCode: Int&#59; isRetryable = true }
     }
 
-    class NetworkError {
-        <<sealed>>
-        +message: String
-        +diagnostic: Diagnostic?
-        +isRetryable: Boolean
-    }
-
-    class Connectivity { +isRetryable = true }
-    class Timeout { +isRetryable = true }
-    class Cancelled { +isRetryable = false }
-    class Authentication { +isRetryable = false }
-    class Authorization { +isRetryable = false }
-    class ClientError { +statusCode: Int }
-    class ServerError { +statusCode: Int&#59; isRetryable = true }
-    class Serialization { +isRetryable = false }
-    class ResponseValidation { +reason: String }
-    class Unknown { +isRetryable = false }
-
-    class Diagnostic {
-        +description: String
-        +cause: Throwable?
-        +metadata: Map
+    namespace ProcessingErrors {
+        class Serialization { +isRetryable = false }
+        class ResponseValidation { +reason: String }
+        class Unknown { +isRetryable = false }
     }
 
     NetworkResult <|-- Success
     NetworkResult <|-- Failure
     Success --> ResponseMetadata
     Failure --> NetworkError
+
     NetworkError <|-- Connectivity
     NetworkError <|-- Timeout
     NetworkError <|-- Cancelled
@@ -194,76 +218,94 @@ classDiagram
 
 ```mermaid
 classDiagram
-    direction TB
+    direction LR
 
-    class Credential {
-        <<sealed interface>>
-    }
-    class Bearer { +token: String }
-    class ApiKey { +key: String&#59; +headerName: String }
-    class Basic { +username: String&#59; +password: String }
-    class Custom { +type: String&#59; +properties: Map }
+    namespace CredentialManagement {
+        class Credential {
+            <<sealed interface>>
+        }
+        class Bearer { +token: String }
+        class ApiKey { +key: String&#59; +headerName: String }
+        class Basic { +username: String&#59; +password: String }
+        class Custom { +type: String&#59; +properties: Map }
 
-    class CredentialProvider {
-        <<interface>>
-        +current() Credential?
-    }
+        class CredentialProvider {
+            <<interface>>
+            +current() Credential?
+            +refresh() Credential?
+            +invalidate()
+        }
 
-    class CredentialHeaderMapper {
-        <<object>>
-        +toHeaders(credential) Map~String,String~
-    }
-
-    class SessionController {
-        <<interface>>
-        +state: StateFlow~SessionState~
-        +events: Flow~SessionEvent~
-        +startSession(credentials)
-        +refreshSession() Boolean
-        +endSession()
+        class CredentialHeaderMapper {
+            <<object>>
+            +toHeaders(credential) Map~String,String~
+        }
     }
 
-    class SessionState {
-        <<sealed interface>>
-    }
-    class Idle
-    class Active { +credential: Credential }
-    class Expired
+    namespace SessionLifecycle {
+        class SessionController {
+            <<interface>>
+            +state: StateFlow~SessionState~
+            +events: Flow~SessionEvent~
+            +isAuthenticated: Boolean
+            +startSession(credentials)
+            +refreshSession() RefreshOutcome
+            +endSession()
+            +invalidate()
+        }
 
-    class SessionCredentials {
-        +credential: Credential
-        +refreshToken: String?
-        +expiresAtMs: Long?
-    }
+        class SessionState {
+            <<sealed interface>>
+        }
+        class Idle
+        class Active { +credential: Credential }
+        class Expired
 
-    class SecretStore {
-        <<interface>>
-        +putString(key, value)
-        +getString(key) String?
-        +putBytes(key, value)
-        +getBytes(key) ByteArray?
-        +remove(key)
-        +clear()
-        +contains(key) Boolean
-    }
-
-    class TrustPolicy {
-        <<interface>>
-        +evaluateHost(hostname) TrustEvaluation
-        +pinnedCertificates() Map
+        class SessionCredentials {
+            +credential: Credential
+            +refreshToken: String?
+            +expiresAtMs: Long?
+        }
     }
 
-    class LogSanitizer {
-        <<interface>>
-        +sanitize(key, value) String
+    namespace Storage {
+        class SecretStore {
+            <<interface>>
+            +putString(key, value)
+            +getString(key) String?
+            +putBytes(key, value)
+            +getBytes(key) ByteArray?
+            +remove(key)
+            +clear()
+            +contains(key) Boolean
+            +keys() Set~String~
+            +putStringIfAbsent(key, value) Boolean
+        }
+    }
+
+    namespace Trust {
+        class TrustPolicy {
+            <<interface>>
+            +evaluateHost(hostname) TrustEvaluation
+            +pinnedCertificates() Map
+        }
+    }
+
+    namespace LogProtection {
+        class LogSanitizer {
+            <<interface>>
+            +sanitize(key, value) String
+        }
     }
 
     Credential <|.. Bearer
     Credential <|.. ApiKey
     Credential <|.. Basic
     Credential <|.. Custom
+
     CredentialProvider --> Credential : provides
     CredentialHeaderMapper --> Credential : converts
+
     SessionController --> SessionState : exposes
     SessionState <|.. Idle
     SessionState <|.. Active
@@ -283,8 +325,9 @@ classDiagram
 <summary>Código fuente Mermaid</summary>
 
 ```mermaid
-graph LR
+graph TD
     subgraph security-core["security-core"]
+        direction LR
         CP["CredentialProvider"]
         CHM["CredentialHeaderMapper"]
         CR["Credential"]
@@ -292,20 +335,21 @@ graph LR
         CHM -->|"toHeaders()"| CR
     end
 
+    subgraph consumer["Módulo de Dominio (e.g. sample-api)"]
+        AI["Auth Interceptor"]
+    end
+
     subgraph network-core["network-core"]
+        direction LR
         RI["RequestInterceptor"]
         HR["HttpRequest"]
         RI -->|"modifies"| HR
     end
 
-    subgraph consumer["Módulo de Dominio"]
-        AI["Auth Interceptor"]
-        AI -->|"calls"| CP
-        AI -->|"calls"| CHM
-        AI -->|"implements"| RI
-    end
-
-    CHM -->|"Map&lt;String,String&gt;"| AI
+    AI -->|"1. calls current()"| CP
+    AI -->|"2. calls toHeaders()"| CHM
+    CHM -.->|"Map&lt;String,String&gt;"| AI
+    AI -->|"3. implements"| RI
 
     style security-core fill:#fce4ec,stroke:#c62828
     style network-core fill:#e1f5fe,stroke:#0277bd

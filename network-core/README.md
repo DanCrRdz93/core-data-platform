@@ -198,33 +198,52 @@ network-core/src/commonMain/kotlin/com/dancr/platform/network/
 
 ```mermaid
 flowchart TD
-    A[execute called] --> B[Prepare Request]
-    B --> B1[Merge defaultHeaders]
-    B1 --> B2[Build full URL: baseUrl + path]
-    B2 --> B3["Run RequestInterceptor chain<br/>(auth, tracing, custom headers)"]
-    B3 --> C[Notify observers: onRequestStarted]
+    subgraph Prepare["① Prepare"]
+        A[execute called] --> B1[Merge defaultHeaders]
+        B1 --> B2[Build full URL: baseUrl + path]
+        B2 --> B3["Run RequestInterceptor chain<br/>(auth, tracing, custom headers)"]
+        B3 --> C[Notify observers: onRequestStarted]
+    end
+
     C --> D{Retry Loop}
-    D --> E["HttpEngine.execute(request)"]
-    E -->|Transport exception| F[ErrorClassifier.classify → NetworkError]
-    E -->|RawResponse| G["Run ResponseInterceptor chain<br/>(logging, caching)"]
-    G --> H[Notify observers: onResponseReceived]
-    H --> I["ResponseValidator.validate(response)"]
-    I -->|Valid| J["deserialize(response) → T"]
-    I -->|Invalid + 2xx| K[NetworkError.ResponseValidation]
-    I -->|Invalid + non-2xx| L[ErrorClassifier.classify → semantic error]
+
+    subgraph Transport["② Transport"]
+        D --> E["HttpEngine.execute(request)"]
+    end
+
+    E -->|Transport exception| F[ErrorClassifier.classify<br/>→ NetworkError]
+    E -->|RawResponse| G["Run ResponseInterceptor chain"]
+
+    subgraph Validate["③ Validate & Deserialize"]
+        G --> H[Notify observers: onResponseReceived]
+        H --> I["ResponseValidator.validate(response)"]
+        I -->|Valid 2xx| J["deserialize(response) → T"]
+        I -->|Invalid 2xx| K[NetworkError.ResponseValidation]
+        I -->|Invalid non-2xx| L[ErrorClassifier.classify<br/>→ semantic error]
+    end
+
     J -->|Success| M["NetworkResult.Success(data, metadata)"]
     J -->|Exception| N[NetworkError.Serialization]
-    F --> O{error.isRetryable AND attempts left?}
+
+    subgraph Retry["④ Retry Decision"]
+        O{error.isRetryable<br/>AND attempts left?}
+        O -->|Yes| P[onRetryScheduled → delay]
+        O -->|No| Q[NetworkResult.Failure]
+    end
+
+    F --> O
     K --> O
     L --> O
     N --> O
-    O -->|Yes| P[Notify: onRetryScheduled → delay → retry]
     P --> D
-    O -->|No| Q[NetworkResult.Failure]
 
     style A fill:#e3f2fd
-    style M fill:#e8f5e9
-    style Q fill:#ffebee
+    style M fill:#e8f5e9,stroke:#2e7d32
+    style Q fill:#ffebee,stroke:#c62828
+    style Prepare fill:#f5f5f5,stroke:#bdbdbd
+    style Transport fill:#e3f2fd,stroke:#1565c0
+    style Validate fill:#fff3e0,stroke:#ef6c00
+    style Retry fill:#fce4ec,stroke:#c62828
 ```
 
 ### Comportamientos clave

@@ -10,25 +10,29 @@ Vista general de cómo el SDK Core Data Platform encaja dentro de una aplicació
 ```mermaid
 graph TD
     subgraph Application["Consuming Application"]
+        direction LR
         F1["Feature A<br/>(ViewModel / UI)"]
         F2["Feature B<br/>(ViewModel / UI)"]
         F3["Feature C<br/>(ViewModel / UI)"]
     end
 
     subgraph Domain["Domain API Modules"]
+        direction LR
         DA[":payments-api"]
         DB[":loyalty-api"]
         DC[":sample-api"]
     end
 
     subgraph SDK["Core Data Platform SDK"]
+        direction LR
         subgraph Network["Network Layer"]
+            direction LR
             NC[":network-core<br/><i>Contracts, pipeline,<br/>error model, retry</i>"]
-            NK[":network-ktor<br/><i>Ktor transport adapter</i>"]
+            NK[":network-ktor<br/><i>Ktor transport<br/>adapter</i>"]
         end
 
         subgraph Security["Security Layer"]
-            SC[":security-core<br/><i>Credentials, sessions,<br/>storage, trust, sanitization</i>"]
+            SC[":security-core<br/><i>Credentials, sessions,<br/>storage, trust,<br/>sanitization</i>"]
         end
     end
 
@@ -36,17 +40,11 @@ graph TD
     F2 --> DB
     F3 --> DC
 
-    DA --> NC
-    DA --> NK
-    DA --> SC
-    DB --> NC
-    DB --> NK
-    DB --> SC
-    DC --> NC
-    DC --> NK
-    DC --> SC
+    DA & DB & DC --> NC
+    DA & DB & DC --> NK
+    DA & DB & DC --> SC
 
-    NK --> NC
+    NK -.->|uses| NC
 
     style Application fill:#f3e5f5,stroke:#7b1fa2
     style Domain fill:#fff3e0,stroke:#ef6c00

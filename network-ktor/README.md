@@ -91,18 +91,27 @@ Dos funciones de extensión privadas soportan el engine:
 
 ```mermaid
 sequenceDiagram
-    participant E as DefaultSafeRequestExecutor
+    participant E as DefaultSafe<br/>RequestExecutor
     participant K as KtorHttpEngine
     participant C as Ktor HttpClient
-    participant N as Network (OkHttp / Darwin)
+    participant N as Network<br/>(OkHttp / Darwin)
 
     E->>K: execute(HttpRequest)
-    K->>K: Translate HttpRequest → Ktor request builder
-    K->>C: client.request(url) { method, headers, body }
-    C->>N: Platform HTTP call
-    N-->>C: Platform response
+
+    Note over K: Translate HttpRequest<br/>→ Ktor request builder
+
+    K->>C: client.request(url)<br/>{ method, headers, body }
+
+    rect rgb(240, 248, 255)
+        Note over C,N: Platform Transport + TLS
+        C->>N: Platform HTTP call
+        N-->>C: Platform response
+    end
+
     C-->>K: Ktor HttpResponse
-    K->>K: Translate → RawResponse(statusCode, headers, body)
+
+    Note over K: Translate Ktor HttpResponse<br/>→ RawResponse
+
     K-->>E: RawResponse
 ```
 
@@ -259,12 +268,14 @@ implementation(libs.ktor.client.darwin)        // io.ktor:ktor-client-darwin:3.0
 ```mermaid
 graph LR
     NK[":network-ktor"] --> NC[":network-core"]
+    NK --> SC[":security-core"]
     NK --> KTOR["ktor-client-core"]
     NK -->|androidMain| OKHTTP["ktor-client-okhttp"]
     NK -->|iosMain| DARWIN["ktor-client-darwin"]
 
     style NK fill:#e8f5e9,stroke:#2e7d32
     style NC fill:#e1f5fe,stroke:#0277bd
+    style SC fill:#fce4ec,stroke:#c62828
     style KTOR fill:#f5f5f5,stroke:#616161
     style OKHTTP fill:#e8f5e9,stroke:#388e3c
     style DARWIN fill:#fff3e0,stroke:#ef6c00

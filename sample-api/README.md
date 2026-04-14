@@ -35,25 +35,47 @@ Cada módulo de API de dominio sigue exactamente esta estructura de capas:
 
 ```mermaid
 graph TD
-    CONSUMER["Consumer (ViewModel, UseCase)"]
-    REPO["Repository<br/><i>UserRepository</i>"]
-    DS["DataSource<br/><i>UserRemoteDataSource</i>"]
-    MAPPER["Mapper<br/><i>UserMapper</i>"]
-    DTO["DTO<br/><i>UserDto, CompanyDto</i>"]
-    MODEL["Domain Model<br/><i>User</i>"]
-    FACTORY["Factory<br/><i>SampleApiFactory</i>"]
-    EXEC["SafeRequestExecutor<br/><i>(from :network-core)</i>"]
+    subgraph consumer_layer["Consumer Layer"]
+        CONSUMER["Consumer<br/><i>(ViewModel, UseCase)</i>"]
+    end
+
+    subgraph domain_layer["Domain Logic"]
+        direction LR
+        REPO["Repository<br/><i>UserRepository</i>"]
+        MAPPER["Mapper<br/><i>UserMapper</i>"]
+        MODEL["Domain Model<br/><i>User</i>"]
+    end
+
+    subgraph data_layer["Data Access"]
+        direction LR
+        DS["DataSource<br/><i>UserRemoteDataSource</i>"]
+        DTO["DTO<br/><i>UserDto, CompanyDto</i>"]
+    end
+
+    subgraph sdk_layer["SDK (:network-core)"]
+        EXEC["SafeRequestExecutor"]
+    end
+
+    subgraph wiring["Assembly"]
+        FACTORY["Factory<br/><i>SampleApiFactory</i>"]
+    end
 
     CONSUMER --> REPO
     REPO --> DS
     REPO --> MAPPER
-    DS --> EXEC
     MAPPER --> DTO
     MAPPER --> MODEL
-    FACTORY -->|creates| REPO
-    FACTORY -->|wires| DS
-    FACTORY -->|wires| EXEC
+    DS --> EXEC
 
+    FACTORY -.->|creates| REPO
+    FACTORY -.->|wires| DS
+    FACTORY -.->|wires| EXEC
+
+    style consumer_layer fill:#f3e5f5,stroke:#7b1fa2
+    style domain_layer fill:#e1f5fe,stroke:#0277bd
+    style data_layer fill:#e8f5e9,stroke:#2e7d32
+    style sdk_layer fill:#e3f2fd,stroke:#1565c0
+    style wiring fill:#f5f5f5,stroke:#9e9e9e
     style CONSUMER fill:#f3e5f5,stroke:#7b1fa2
     style REPO fill:#e1f5fe,stroke:#0277bd
     style DS fill:#e8f5e9,stroke:#2e7d32
@@ -385,14 +407,26 @@ implementation(libs.kotlinx.serialization.json)      // 1.7.3
 ```
 
 ```mermaid
-graph LR
-    SA[":sample-api"] --> NC[":network-core"]
-    SA --> NK[":network-ktor"]
-    SA --> SC[":security-core"]
-    SA --> SER["kotlinx-serialization-json"]
-    NK --> NC
+graph TD
+    SA[":sample-api"]
+
+    subgraph SDK["SDK Modules"]
+        direction LR
+        NC[":network-core"]
+        NK[":network-ktor"]
+        SC[":security-core"]
+    end
+
+    SER["kotlinx-serialization-json"]
+
+    SA --> NC
+    SA --> NK
+    SA --> SC
+    SA --> SER
+    NK -.-> NC
 
     style SA fill:#fff3e0,stroke:#ef6c00
+    style SDK fill:#fafafa,stroke:#9e9e9e
     style NC fill:#e1f5fe,stroke:#0277bd
     style NK fill:#e8f5e9,stroke:#2e7d32
     style SC fill:#fce4ec,stroke:#c62828
