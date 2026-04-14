@@ -1,5 +1,6 @@
 graph LR
     subgraph execution["Execution Pipeline"]
+        direction TB
         SRE["SafeRequestExecutor<br/><i>interface</i>"]
         DSRE["DefaultSafeRequestExecutor"]
         HE["HttpEngine<br/><i>interface</i>"]
@@ -15,6 +16,7 @@ graph LR
     end
 
     subgraph result["Result Model"]
+        direction TB
         NR["NetworkResult T<br/><i>sealed class</i>"]
         NRS["Success T"]
         NRF["Failure"]
@@ -24,6 +26,7 @@ graph LR
     end
 
     subgraph security["Security Contracts"]
+        direction TB
         CR["Credential<br/><i>sealed interface</i>"]
         CP["CredentialProvider<br/><i>interface</i>"]
         CHM["CredentialHeaderMapper<br/><i>object</i>"]
