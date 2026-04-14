@@ -1,74 +1,92 @@
 classDiagram
-    direction TB
+    direction LR
 
-    class Credential {
-        &lt;&lt;sealed interface&gt;&gt;
-    }
-    class Bearer { +token: String }
-    class ApiKey { +key: String; +headerName: String }
-    class Basic { +username: String; +password: String }
-    class Custom { +type: String; +properties: Map }
+    namespace CredentialManagement {
+        class Credential {
+            <<sealed interface>>
+        }
+        class Bearer { +token: String }
+        class ApiKey { +key: String; +headerName: String }
+        class Basic { +username: String; +password: String }
+        class Custom { +type: String; +properties: Map }
 
-    class CredentialProvider {
-        &lt;&lt;interface&gt;&gt;
-        +current() Credential?
-    }
+        class CredentialProvider {
+            <<interface>>
+            +current() Credential?
+            +refresh() Credential?
+            +invalidate()
+        }
 
-    class CredentialHeaderMapper {
-        &lt;&lt;object&gt;&gt;
-        +toHeaders(credential) Map~String,String~
-    }
-
-    class SessionController {
-        &lt;&lt;interface&gt;&gt;
-        +state: StateFlow~SessionState~
-        +events: Flow~SessionEvent~
-        +startSession(credentials)
-        +refreshSession() Boolean
-        +endSession()
+        class CredentialHeaderMapper {
+            <<object>>
+            +toHeaders(credential) Map~String,String~
+        }
     }
 
-    class SessionState {
-        &lt;&lt;sealed interface&gt;&gt;
-    }
-    class Idle
-    class Active { +credential: Credential }
-    class Expired
+    namespace SessionLifecycle {
+        class SessionController {
+            <<interface>>
+            +state: StateFlow~SessionState~
+            +events: Flow~SessionEvent~
+            +isAuthenticated: Boolean
+            +startSession(credentials)
+            +refreshSession() RefreshOutcome
+            +endSession()
+            +invalidate()
+        }
 
-    class SessionCredentials {
-        +credential: Credential
-        +refreshToken: String?
-        +expiresAtMs: Long?
-    }
+        class SessionState {
+            <<sealed interface>>
+        }
+        class Idle
+        class Active { +credential: Credential }
+        class Expired
 
-    class SecretStore {
-        &lt;&lt;interface&gt;&gt;
-        +putString(key, value)
-        +getString(key) String?
-        +putBytes(key, value)
-        +getBytes(key) ByteArray?
-        +remove(key)
-        +clear()
-        +contains(key) Boolean
-    }
-
-    class TrustPolicy {
-        &lt;&lt;interface&gt;&gt;
-        +evaluateHost(hostname) TrustEvaluation
-        +pinnedCertificates() Map
+        class SessionCredentials {
+            +credential: Credential
+            +refreshToken: String?
+            +expiresAtMs: Long?
+        }
     }
 
-    class LogSanitizer {
-        &lt;&lt;interface&gt;&gt;
-        +sanitize(key, value) String
+    namespace Storage {
+        class SecretStore {
+            <<interface>>
+            +putString(key, value)
+            +getString(key) String?
+            +putBytes(key, value)
+            +getBytes(key) ByteArray?
+            +remove(key)
+            +clear()
+            +contains(key) Boolean
+            +keys() Set~String~
+            +putStringIfAbsent(key, value) Boolean
+        }
+    }
+
+    namespace Trust {
+        class TrustPolicy {
+            <<interface>>
+            +evaluateHost(hostname) TrustEvaluation
+            +pinnedCertificates() Map
+        }
+    }
+
+    namespace LogProtection {
+        class LogSanitizer {
+            <<interface>>
+            +sanitize(key, value) String
+        }
     }
 
     Credential <|.. Bearer
     Credential <|.. ApiKey
     Credential <|.. Basic
     Credential <|.. Custom
+
     CredentialProvider --> Credential : provides
     CredentialHeaderMapper --> Credential : converts
+
     SessionController --> SessionState : exposes
     SessionState <|.. Idle
     SessionState <|.. Active

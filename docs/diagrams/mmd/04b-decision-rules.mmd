@@ -9,8 +9,12 @@ flowchart TD
     Q1 -->|No| COMMON
     Q1 -->|Yes| Q2
     Q2 -->|"Yes (plain data class)"| COMMON
-    Q2 -->|"No (calls platform API)"| PLATFORM
+    Q2 -->|"No (calls platform API)"| Q3
+    Q3 -->|"No (pure logic)"| PLATFORM
     Q3 -->|"Yes (enum → platform const)"| PLATFORM
 
     style COMMON fill:#e3f2fd,stroke:#1565c0
     style PLATFORM fill:#fff3e0,stroke:#ef6c00
+    style Q1 fill:#fff9c4,stroke:#f9a825
+    style Q2 fill:#fff9c4,stroke:#f9a825
+    style Q3 fill:#fff9c4,stroke:#f9a825

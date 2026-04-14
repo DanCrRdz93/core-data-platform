@@ -1,76 +1,87 @@
 classDiagram
-    direction TB
+    direction LR
 
-    class SafeRequestExecutor {
-        &lt;&lt;interface&gt;&gt;
-        +execute(request, context?, deserialize) NetworkResult~T~
+    namespace Executor {
+        class SafeRequestExecutor {
+            <<interface>>
+            +execute(request, context?, deserialize) NetworkResult~T~
+        }
+
+        class DefaultSafeRequestExecutor {
+            -engine: HttpEngine
+            -config: NetworkConfig
+            -validator: ResponseValidator
+            -classifier: ErrorClassifier
+            -interceptors: List~RequestInterceptor~
+            -responseInterceptors: List~ResponseInterceptor~
+            -observers: List~NetworkEventObserver~
+            +execute(request, context?, deserialize) NetworkResult~T~
+        }
     }
 
-    class DefaultSafeRequestExecutor {
-        -engine: HttpEngine
-        -config: NetworkConfig
-        -validator: ResponseValidator
-        -classifier: ErrorClassifier
-        -interceptors: List~RequestInterceptor~
-        -responseInterceptors: List~ResponseInterceptor~
-        -observers: List~NetworkEventObserver~
-        +execute(request, context?, deserialize) NetworkResult~T~
+    namespace Transport {
+        class HttpEngine {
+            <<interface>>
+            +execute(request) RawResponse
+            +close()
+            +healthCheck() Boolean
+        }
+
+        class KtorHttpEngine {
+            -client: HttpClient
+            +execute(request) RawResponse
+            +close()
+            +create(config, trustPolicy?)$ KtorHttpEngine
+        }
     }
 
-    class HttpEngine {
-        &lt;&lt;interface&gt;&gt;
-        +execute(request) RawResponse
-        +close()
+    namespace Interceptors {
+        class RequestInterceptor {
+            <<fun interface>>
+            +intercept(request, context?) HttpRequest
+        }
+
+        class ResponseInterceptor {
+            <<fun interface>>
+            +intercept(response, request, context?) RawResponse
+        }
     }
 
-    class KtorHttpEngine {
-        -client: HttpClient
-        +execute(request) RawResponse
-        +close()
-        +create(config)$ KtorHttpEngine
+    namespace Validation {
+        class ErrorClassifier {
+            <<interface>>
+            +classify(response?, cause?) NetworkError
+        }
+
+        class DefaultErrorClassifier {
+            <<open>>
+            +classify(response?, cause?) NetworkError
+            #classifyThrowable(cause) NetworkError
+            #classifyResponse(response) NetworkError
+        }
+
+        class KtorErrorClassifier {
+            #classifyThrowable(cause) NetworkError
+        }
+
+        class ResponseValidator {
+            <<interface>>
+            +validate(response) ValidationOutcome
+        }
+
+        class DefaultResponseValidator {
+            +validate(response) ValidationOutcome
+        }
     }
 
-    class RequestInterceptor {
-        &lt;&lt;fun interface&gt;&gt;
-        +intercept(request, context?) HttpRequest
-    }
-
-    class ResponseInterceptor {
-        &lt;&lt;fun interface&gt;&gt;
-        +intercept(response, request, context?) RawResponse
-    }
-
-    class ErrorClassifier {
-        &lt;&lt;interface&gt;&gt;
-        +classify(response?, cause?) NetworkError
-    }
-
-    class DefaultErrorClassifier {
-        &lt;&lt;open&gt;&gt;
-        +classify(response?, cause?) NetworkError
-        #classifyThrowable(cause) NetworkError
-        #classifyResponse(response) NetworkError
-    }
-
-    class KtorErrorClassifier {
-        #classifyThrowable(cause) NetworkError
-    }
-
-    class ResponseValidator {
-        &lt;&lt;interface&gt;&gt;
-        +validate(response) ValidationOutcome
-    }
-
-    class DefaultResponseValidator {
-        +validate(response) ValidationOutcome
-    }
-
-    class NetworkEventObserver {
-        &lt;&lt;interface&gt;&gt;
-        +onRequestStarted(request, context?)
-        +onResponseReceived(request, response, durationMs, context?)
-        +onRetryScheduled(request, attempt, max, error, delayMs)
-        +onRequestFailed(request, error, durationMs, context?)
+    namespace Observability {
+        class NetworkEventObserver {
+            <<interface>>
+            +onRequestStarted(request, context?)
+            +onResponseReceived(request, response, durationMs, context?)
+            +onRetryScheduled(request, attempt, max, error, delayMs)
+            +onRequestFailed(request, error, durationMs, context?)
+        }
     }
 
     SafeRequestExecutor <|.. DefaultSafeRequestExecutor

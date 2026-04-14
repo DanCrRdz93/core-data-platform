@@ -1,15 +1,27 @@
-graph TD
-    APP[":app"]
-    SA[":sample-api"]
-    NK[":network-ktor"]
-    NC[":network-core"]
-    SC[":security-core"]
+graph LR
+    subgraph App["Application"]
+        APP[":app"]
+    end
 
-    COROUTINES["kotlinx-coroutines-core<br/><i>1.10.1</i>"]
-    KTOR_CORE["ktor-client-core<br/><i>3.0.3</i>"]
-    KTOR_OK["ktor-client-okhttp<br/><i>3.0.3 (Android)</i>"]
-    KTOR_DAR["ktor-client-darwin<br/><i>3.0.3 (iOS)</i>"]
-    SER["kotlinx-serialization-json<br/><i>1.7.3</i>"]
+    subgraph Domain["Domain"]
+        SA[":sample-api"]
+    end
+
+    subgraph SDK["SDK Modules"]
+        direction TB
+        NK[":network-ktor"]
+        NC[":network-core"]
+        SC[":security-core"]
+    end
+
+    subgraph External["External Dependencies"]
+        direction TB
+        KTOR_CORE["ktor-client-core<br/><i>3.0.3</i>"]
+        KTOR_OK["ktor-client-okhttp<br/><i>3.0.3 (Android)</i>"]
+        KTOR_DAR["ktor-client-darwin<br/><i>3.0.3 (iOS)</i>"]
+        SER["kotlinx-serialization-json<br/><i>1.7.3</i>"]
+        COROUTINES["kotlinx-coroutines-core<br/><i>1.10.1</i>"]
+    end
 
     APP --> SA
     APP --> NK
@@ -28,6 +40,10 @@ graph TD
     NC --> COROUTINES
     SC --> COROUTINES
 
+    style App fill:#f3e5f5,stroke:#7b1fa2
+    style Domain fill:#fff3e0,stroke:#ef6c00
+    style SDK fill:#e8eaf6,stroke:#3949ab
+    style External fill:#fafafa,stroke:#9e9e9e
     style APP fill:#f3e5f5,stroke:#7b1fa2
     style SA fill:#fff3e0,stroke:#ef6c00
     style NK fill:#c8e6c9,stroke:#2e7d32

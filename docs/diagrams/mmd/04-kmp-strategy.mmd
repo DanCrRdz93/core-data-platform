@@ -1,47 +1,61 @@
 graph TB
-    subgraph commonMain["commonMain  -  43 files  -  95%+ of code"]
-        direction TB
-        subgraph nc_common["network-core  20 files"]
-            NC1["HttpEngine  HttpRequest  RawResponse  HttpMethod"]
-            NC2["SafeRequestExecutor  DefaultSafeRequestExecutor"]
-            NC3["RequestInterceptor  ResponseInterceptor"]
-            NC4["ErrorClassifier  DefaultErrorClassifier"]
-            NC5["NetworkEventObserver"]
-            NC6["NetworkResult  NetworkError  Diagnostic"]
-            NC7["NetworkConfig  RetryPolicy  RequestContext"]
+    subgraph commonMain["commonMain — 43 archivos (95%+)"]
+        direction LR
+        subgraph nc_common["network-core (20 files)"]
+            NC1["HttpEngine, HttpRequest,<br/>RawResponse, HttpMethod"]
+            NC2["SafeRequestExecutor,<br/>DefaultSafeRequestExecutor"]
+            NC3["RequestInterceptor,<br/>ResponseInterceptor"]
+            NC4["ErrorClassifier,<br/>DefaultErrorClassifier"]
+            NC5["ResponseValidator,<br/>DefaultResponseValidator"]
+            NC6["NetworkEventObserver,<br/>LoggingObserver,<br/>MetricsObserver,<br/>TracingObserver"]
+            NC7["NetworkResult,<br/>NetworkError, Diagnostic"]
+            NC8["NetworkConfig,<br/>RetryPolicy, RequestContext"]
+            NC9["RemoteDataSource,<br/>ResponseMetadata"]
         end
 
-        subgraph nk_common["network-ktor  2 files"]
-            NK1["KtorHttpEngine  KtorErrorClassifier"]
+        subgraph nk_common["network-ktor (4 files)"]
+            NK1["KtorHttpEngine"]
+            NK2["KtorErrorClassifier"]
+            NK3["PlatformHttpClient"]
         end
 
-        subgraph sc_common["security-core  15 files"]
-            SC1["Credential  CredentialProvider  CredentialHeaderMapper"]
-            SC2["SessionController  SessionState  SessionEvent"]
-            SC3["SecretStore  TrustPolicy  LogSanitizer"]
-            SC4["SecurityError  Diagnostic  Base64"]
+        subgraph sc_common["security-core (15 files)"]
+            SC1["Credential, CredentialProvider,<br/>CredentialHeaderMapper"]
+            SC2["SessionController, SessionState,<br/>SessionEvent, SessionCredentials"]
+            SC3["SecretStore"]
+            SC4["TrustPolicy, TrustEvaluation,<br/>CertificatePin, DefaultTrustPolicy"]
+            SC5["LogSanitizer,<br/>DefaultLogSanitizer,<br/>SecurityConfig"]
+            SC6["SecurityError, Diagnostic,<br/>Base64"]
         end
 
-        subgraph sa_common["sample-api  6 files"]
-            SA1["UserDto  User  UserMapper"]
-            SA2["UserRemoteDataSource  UserRepository  SampleApiFactory"]
+        subgraph sa_common["sample-api (6 files)"]
+            SA1["UserDto, User, UserMapper"]
+            SA2["UserRemoteDataSource,<br/>UserRepository,<br/>SampleApiFactory"]
         end
     end
 
-    subgraph androidMain["androidMain  -  2 files"]
-        AND1["AndroidSecretStore"]
-        AND2["AndroidStoreConfig"]
+    subgraph platformMain["Platform Source Sets"]
+        direction LR
+        subgraph androidMain["androidMain — 3 archivos"]
+            AND1["AndroidSecretStore<br/><i>EncryptedSharedPreferences<br/>+ Android Keystore</i>"]
+            AND2["AndroidStoreConfig"]
+            AND3["PlatformHttpClient.android<br/><i>OkHttp + CertificatePinner</i>"]
+        end
+
+        subgraph iosMain["iosMain — 3 archivos"]
+            IOS1["IosSecretStore<br/><i>Keychain Services</i>"]
+            IOS2["KeychainConfig<br/>+ KeychainAccessibility"]
+            IOS3["PlatformHttpClient.ios<br/><i>Darwin + SecTrust</i>"]
+        end
     end
 
-    subgraph iosMain["iosMain  -  2 files"]
-        IOS1["IosSecretStore"]
-        IOS2["KeychainConfig"]
-    end
-
-    SC3 -->|implements| AND1
-    SC3 -->|implements| IOS1
+    SC3 -->|"implements"| AND1
+    SC3 -->|"implements"| IOS1
+    NK3 -->|"actual"| AND3
+    NK3 -->|"actual"| IOS3
 
     style commonMain fill:#e3f2fd,stroke:#1565c0
+    style platformMain fill:#fafafa,stroke:#9e9e9e
     style androidMain fill:#e8f5e9,stroke:#2e7d32
     style iosMain fill:#fff3e0,stroke:#ef6c00
     style nc_common fill:#bbdefb,stroke:#1565c0
