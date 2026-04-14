@@ -30,7 +30,8 @@ Cada clase en este módulo es una **interfaz**, una **sealed class**, una **data
 | Modelar errores con mensajes seguros para usuario + diagnósticos internos | `NetworkError`, `Diagnostic` |
 | Envolver resultados con semántica de éxito/fallo | `NetworkResult<T>`, `ResponseMetadata` |
 | Configurar comportamiento de reintentos | `RetryPolicy` (None, FixedDelay, ExponentialBackoff) |
-| Proveer hooks de observabilidad | `NetworkEventObserver`, `LoggingObserver`, `NetworkLogger` |
+| Proveer hooks de observabilidad | `NetworkEventObserver`, `LoggingObserver`, `MetricsObserver`, `TracingObserver` |
+| Abstraer backends de observabilidad | `NetworkLogger`, `MetricsCollector`, `TracingBackend` (todos NOOP por defecto) |
 | Proveer clase base para data sources remotos | `RemoteDataSource` |
 | Contener configuración de red | `NetworkConfig` |
 
@@ -44,6 +45,7 @@ Cada clase en este módulo es una **interfaz**, una **sealed class**, una **data
 interface HttpEngine {
     suspend fun execute(request: HttpRequest): RawResponse
     fun close()
+    suspend fun healthCheck(): Boolean  // default: true
 }
 ```
 
@@ -174,8 +176,12 @@ network-core/src/commonMain/kotlin/com/dancr/platform/network/
 │
 ├── observability/                  # Hooks de observabilidad
 │   ├── NetworkEventObserver.kt     # Callbacks de ciclo de vida con default no-op
-│   ├── NetworkLogger.kt            # fun interface — abstracción de logging (no-op por defecto)
-│   └── LoggingObserver.kt          # Observer que registra requests/responses vía NetworkLogger
+│   ├── NetworkLogger.kt            # fun interface — abstracción de logging (NOOP por defecto)
+│   ├── LoggingObserver.kt          # Observer que registra requests/responses vía NetworkLogger
+│   ├── MetricsCollector.kt         # Interfaz — abstracción de métricas (NOOP por defecto)
+│   ├── MetricsObserver.kt          # Observer que registra latencia, errores, retries vía MetricsCollector
+│   ├── TracingBackend.kt           # Interfaz — abstracción de tracing (NOOP por defecto)
+│   └── TracingObserver.kt          # Observer que genera span/trace IDs vía TracingBackend
 │
 └── result/                         # Tipos de resultado
     ├── NetworkResult.kt            # Sealed: Success<T> | Failure
@@ -379,7 +385,10 @@ class MetricsObserver(private val client: MetricsClient) : NetworkEventObserver 
 | **Procesamiento pre-request** | Agregar un `RequestInterceptor` (auth, tracing, headers custom) |
 | **Procesamiento post-respuesta** | Agregar un `ResponseInterceptor` (logging, caching, extracción de headers) |
 | **Logging** | Usar `LoggingObserver` con tu propio `NetworkLogger`. Sanitizar headers vía `headerSanitizer` lambda |
-| **Observabilidad personalizada** | Implementar `NetworkEventObserver` (métricas, tracing) |
+| **Métricas** | Usar `MetricsObserver` con tu propio `MetricsCollector`. Registra latencia, errores, retries |
+| **Tracing** | Usar `TracingObserver` con tu propio `TracingBackend`. Genera span/trace IDs |
+| **Observabilidad personalizada** | Implementar `NetworkEventObserver` directamente para casos no cubiertos |
+| **Health check** | Sobreescribir `HttpEngine.healthCheck()` para liveness probing personalizado |
 | **Políticas de reintento personalizadas** | Agregar nuevos subtipos de `RetryPolicy` (requiere modificar la sealed class) |
 
 ---
@@ -396,14 +405,19 @@ class MetricsObserver(private val client: MetricsClient) : NetworkEventObserver 
 
 ---
 
-## TODOs y Trabajo Futuro
+## Completado Recientemente
 
 | Ítem | Ubicación | Descripción |
 |---|---|---|
-| `healthCheck()` | `HttpEngine` | Pool de conexiones / prueba de vivacidad |
+| ✅ `MetricsObserver` + `MetricsCollector` | `observability/` | Registra conteo de requests, latencia, errores, retries vía backend inyectable (NOOP default) |
+| ✅ `TracingObserver` + `TracingBackend` | `observability/` | Genera span/trace IDs, reporta inicio/fin de spans vía backend inyectable (NOOP default) |
+| ✅ `HttpEngine.healthCheck()` | `client/` | Liveness probing con default `true`. `KtorHttpEngine` verifica estado del engine |
+
+## Trabajo Futuro
+
+| Ítem | Ubicación | Descripción |
+|---|---|---|
 | `classifyForRetry()` | `ErrorClassifier` | Clasificación por intento para patrones de circuit breaker |
-| `MetricsObserver` | `observability/` | Recolectar conteo de requests, histogramas de latencia, tasas de error |
-| `TracingObserver` | `observability/` | Crear spans por request, propagar `parentSpanId` vía headers |
 | `CachingResponseInterceptor` | `execution/` | Caching condicional basado en headers `Cache-Control` |
 | Circuit breaker `RetryPolicy` | `config/` | Abrir circuito después de N fallos consecutivos |
 

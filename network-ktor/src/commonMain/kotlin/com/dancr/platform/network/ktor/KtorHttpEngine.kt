@@ -14,6 +14,7 @@ import io.ktor.client.statement.readRawBytes
 import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.content.ByteArrayContent
+import kotlinx.coroutines.Job
 import io.ktor.http.HttpMethod as KtorHttpMethod
 
 class KtorHttpEngine(
@@ -55,6 +56,13 @@ class KtorHttpEngine(
         client.close()
     }
 
+    override suspend fun healthCheck(): Boolean =
+        try {
+            !client.engine.coroutineContext[Job]!!.isCancelled
+        } catch (_: Exception) {
+            false
+        }
+
     companion object {
 
         fun create(config: NetworkConfig): KtorHttpEngine {
@@ -65,15 +73,15 @@ class KtorHttpEngine(
                     socketTimeoutMillis = config.writeTimeout.inWholeMilliseconds
                 }
 
-                // TODO: Certificate pinning integration.
+                // Future: Certificate pinning integration.
                 //  Accept TrustPolicy from security-core and configure platform TLS:
                 //  - Android (OkHttp): CertificatePinner via engine { config { certificatePinner(...) } }
                 //  - iOS (Darwin): SecTrust evaluation via handleChallenge in NSURLSessionDelegate
                 //  This requires platform-specific source sets (androidMain / iosMain) in this module.
 
-                // TODO: Logging integration.
-                //  Install Ktor's Logging plugin wired to a LogSanitizer-aware logger:
-                //  install(Logging) { logger = SanitizedKtorLogger(logSanitizer) }
+                // Note: Request/response logging is handled by LoggingObserver at the
+                //  executor level. Ktor's Logging plugin is not needed unless deep
+                //  transport-level debugging (raw wire bytes) is required.
 
                 expectSuccess = false
             }

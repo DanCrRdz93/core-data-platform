@@ -251,8 +251,12 @@ core-data-platform/
 │       │   └── RequestContext.kt             # Metadata por request (operationId, tags, tracing)
 │       ├── observability/
 │       │   ├── NetworkEventObserver.kt       # Callbacks de ciclo de vida para métricas/tracing/logging
-│       │   ├── NetworkLogger.kt              # fun interface — abstracción de logging (no-op por defecto)
-│       │   └── LoggingObserver.kt            # Observer que registra requests/responses vía NetworkLogger
+│       │   ├── NetworkLogger.kt              # fun interface — abstracción de logging (NOOP por defecto)
+│       │   ├── LoggingObserver.kt            # Observer que registra requests/responses vía NetworkLogger
+│       │   ├── MetricsCollector.kt           # Interfaz — abstracción de métricas (NOOP por defecto)
+│       │   ├── MetricsObserver.kt            # Observer que registra latencia, errores, retries
+│       │   ├── TracingBackend.kt             # Interfaz — abstracción de tracing (NOOP por defecto)
+│       │   └── TracingObserver.kt            # Observer que genera span/trace IDs
 │       └── result/
 │           ├── NetworkResult.kt              # Success<T> | Failure — con map, fold, flatMap
 │           ├── NetworkError.kt               # Taxonomía de errores semánticos (sealed class)
@@ -566,7 +570,19 @@ sealed interface Credential {
 }
 ```
 
-`CredentialProvider` provee la credencial actual. `CredentialHeaderMapper` convierte cualquier `Credential` en headers HTTP sin importar ningún tipo de red:
+`CredentialProvider` provee la credencial actual y soporta refresh proactivo e invalidación:
+
+```kotlin
+interface CredentialProvider {
+    suspend fun current(): Credential?          // Credential activa, o null si no hay sesión
+    suspend fun refresh(): Credential?          // Refresh proactivo. Default: delega a current()
+    suspend fun invalidate()                    // Limpiar credential en 401. Default: no-op
+}
+```
+
+`DefaultCredentialProvider` delega `refresh()` a `SessionController.refreshSession()` e `invalidate()` a `SessionController.invalidate()`.
+
+`CredentialHeaderMapper` convierte cualquier `Credential` en headers HTTP sin importar ningún tipo de red:
 
 ```kotlin
 val headers: Map<String, String> = CredentialHeaderMapper.toHeaders(credential)
@@ -581,15 +597,24 @@ val headers: Map<String, String> = CredentialHeaderMapper.toHeaders(credential)
 
 ```kotlin
 interface SessionController {
-    val state: StateFlow<SessionState>   // Idle | Active(credential) | Expired
-    val events: Flow<SessionEvent>       // Started, Refreshed, Expired, Ended, RefreshFailed
+    val state: StateFlow<SessionState>       // Idle | Active(credential) | Expired
+    val events: Flow<SessionEvent>           // Started, Refreshed, Expired, Ended, Invalidated, RefreshFailed
+    val isAuthenticated: Boolean             // Derived from state — true only when Active
     suspend fun startSession(credentials: SessionCredentials)
-    suspend fun refreshSession(): Boolean
+    suspend fun refreshSession(): RefreshOutcome  // Refreshed | NotNeeded | Failed
     suspend fun endSession()
+    suspend fun invalidate()                 // Force-logout (e.g. on 401)
 }
 ```
 
-> **Estado:** Interfaz definida. Implementación disponible: `DefaultSessionController` — gestiona estado con `StateFlow`, persiste tokens en `SecretStore`, soporta refresh configurable vía lambda.
+`RefreshOutcome` es un resultado sealed que distingue claramente qué pasó:
+- **`Refreshed(credential)`** — Se obtuvo una nueva credencial. Sesión activa.
+- **`NotNeeded(reason)`** — No se intentó el refresh (ej. no hay refresh token o no hay provider). El estado actual no cambia.
+- **`Failed(error)`** — Se intentó el refresh pero falló. La sesión transiciona a Expired.
+
+`invalidate()` vs `endSession()`: ambos limpian credenciales y transicionan a Idle. La diferencia es semántica — `endSession()` es logout intencional del usuario, `invalidate()` es forzado externamente (ej. 401, política de seguridad). Emiten eventos diferentes (`Ended` vs `Invalidated`).
+
+> **Estado:** Implementación disponible: `DefaultSessionController` — gestiona estado con `StateFlow`, persiste tokens en `SecretStore`, soporta refresh configurable vía lambda.
 
 ### 3. Almacenamiento Seguro
 
@@ -948,13 +973,16 @@ result.fold(
 | Implementar `IosSecretStore` con Keychain Services | `security-core` | ✅ Completado |
 | Implementar `DefaultSessionController` con StateFlow + almacenamiento de tokens | `security-core` | ✅ Completado |
 | Implementar `DefaultCredentialProvider` respaldado por SessionController | `security-core` | ✅ Completado |
+| `RefreshOutcome` sealed — migrar `refreshSession()` de `Boolean` a resultado tipado | `security-core` | ✅ Completado |
+| `SessionController.invalidate()` + `isAuthenticated` — force-logout y conveniencia | `security-core` | ✅ Completado |
+| `CredentialProvider.refresh()` + `invalidate()` — refresh proactivo e invalidación en 401 | `security-core` | ✅ Completado |
 
 ### Fase 2 — Observabilidad y Testing
 
 | Tarea | Módulo | Estado |
 |---|---|---|
 | `LoggingObserver` + `NetworkLogger` — logging del ciclo de vida de requests con sanitización | `network-core` | ✅ Completado |
-| `MetricsObserver` — latencia, tasa de errores, conteo de reintentos | `network-core` | 🔴 No iniciado |
+| `MetricsObserver` + `MetricsCollector` — latencia, errores, retries con backend inyectable (NOOP default) | `network-core` | ✅ Completado |
 | Tests de integración con Ktor `MockEngine` | `network-ktor` | 🔴 No iniciado |
 | Tests unitarios para `DefaultSafeRequestExecutor` | `network-core` | 🔴 No iniciado |
 
@@ -963,7 +991,7 @@ result.fold(
 | Tarea | Módulo | Estado |
 |---|---|---|
 | Certificate pinning vía `TrustPolicy` → OkHttp / Darwin TLS | `network-ktor` | 🔴 No iniciado |
-| Interceptor de auth refresh (401 → refresh → retry) | Módulo puente | 🔴 No iniciado |
+| Interceptor de auth refresh (401 → refresh → retry) | Módulo puente | 🟡 Habilitado por `CredentialProvider.invalidate()` |
 | Logging de respuestas sanitizado con `LogSanitizer` | `network-core` (vía `headerSanitizer` lambda) | ✅ Completado |
 
 ### Fase 4 — Escala
@@ -971,7 +999,10 @@ result.fold(
 | Tarea | Módulo | Estado |
 |---|---|---|
 | Unificar `Diagnostic` en módulo `:platform-common` | Nuevo módulo | 🔴 No iniciado |
-| `TracingObserver` con propagación de `parentSpanId` | `network-core` | 🔴 No iniciado |
+| `TracingObserver` + `TracingBackend` — span/trace IDs con backend inyectable (NOOP default) | `network-core` | ✅ Completado |
+| `HttpEngine.healthCheck()` — liveness probing (default true, implementado en KtorHttpEngine) | `network-core` / `network-ktor` | ✅ Completado |
+| `SecretStore.keys()` + `putStringIfAbsent()` — migración/diagnóstico y escritura atómica | `security-core` | ✅ Completado |
+| Cleanup de TODOs redundantes — reclasificación de logging/caching/circuit-breaker | Todos | ✅ Completado |
 | Política de reintento circuit breaker | `network-core` | 🔴 No iniciado |
 | Primer módulo de dominio en producción | Nuevo módulo | 🔴 No iniciado |
 

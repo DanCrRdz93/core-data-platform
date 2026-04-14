@@ -4,7 +4,8 @@ data class ResponseMetadata(
     val statusCode: Int = 0,
     val headers: Map<String, List<String>> = emptyMap(),
     val durationMs: Long = 0L,
-    // TODO: Generate via TracingObserver or extract from response headers (e.g. X-Request-Id).
+    // Populated by the executor from response headers (e.g. X-Request-Id) when present.
+    // TracingObserver can also correlate this with its generated span/trace IDs.
     val requestId: String? = null,
     val attemptCount: Int = 1
 ) {

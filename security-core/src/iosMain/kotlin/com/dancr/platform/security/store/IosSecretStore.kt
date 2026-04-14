@@ -75,6 +75,42 @@ class IosSecretStore(
         }
     }
 
+    @OptIn(ExperimentalForeignApi::class)
+    override suspend fun keys(): Set<String> = runSecure {
+        val query = NSMutableDictionary().apply {
+            setValue(kSecClassGenericPassword, forKey = kSecClass as String)
+            setValue(config.serviceName, forKey = kSecAttrService as String)
+            setValue(kCFBooleanTrue, forKey = kSecReturnAttributes as String)
+            setValue(kSecMatchLimitAll, forKey = kSecMatchLimit as String)
+        }
+        memScoped {
+            val result = alloc<ObjCObjectVar<*>>()
+            val status = SecItemCopyMatching(query, result.ptr)
+            when (status) {
+                errSecSuccess -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val items = result.value as? List<Map<String, Any?>> ?: return@runSecure emptySet()
+                    items.mapNotNull { it[kSecAttrAccount as String] as? String }.toSet()
+                }
+                errSecItemNotFound -> emptySet()
+                else -> throw mapOSStatus(status.toInt(), "keys")
+            }
+        }
+    }
+
+    override suspend fun putStringIfAbsent(key: String, value: String): Boolean = runSecure {
+        if (getData(key) != null) {
+            false
+        } else {
+            val data = (value as NSString).dataUsingEncoding(NSUTF8StringEncoding)
+                ?: throw SecurityError.SecureStorageFailure(
+                    diagnostic = Diagnostic(description = "Failed to encode string to NSData")
+                )
+            putData(key, data)
+            true
+        }
+    }
+
     // -- Internal helpers --
 
     private fun putData(key: String, data: NSData) {

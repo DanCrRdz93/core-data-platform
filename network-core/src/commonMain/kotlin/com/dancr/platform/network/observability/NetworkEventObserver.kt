@@ -8,8 +8,10 @@ import com.dancr.platform.network.result.NetworkError
 // Extension point for observability: metrics, tracing, and diagnostics.
 // Default methods are no-op so implementors only override what they need.
 //
-// TODO: Implement MetricsObserver — collect request count, latency histograms, error rates.
-// TODO: Implement TracingObserver — create spans per request, propagate trace context via headers.
+// Built-in implementations:
+//   LoggingObserver  — logs lifecycle events via injectable NetworkLogger.
+//   MetricsObserver  — records latency/error/retry metrics via injectable MetricsCollector.
+//   TracingObserver  — generates span/trace IDs via injectable TracingBackend.
 interface NetworkEventObserver {
 
     fun onRequestStarted(request: HttpRequest, context: RequestContext?) {}

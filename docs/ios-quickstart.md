@@ -291,6 +291,34 @@ El SDK automáticamente:
 - Agrega el header `Authorization: Bearer <token>` si hay sesión activa
 - Si no hay sesión, la request va sin auth
 
+### Refresh, invalidación y estado de sesión
+
+```swift
+// Consultar si hay sesión activa (derivado del estado, nunca estado duplicado)
+if sessionController.isAuthenticated { /* ... */ }
+
+// Refresh proactivo (ej. antes de que expire el token)
+let outcome = try await sessionController.refreshSession()
+switch outcome {
+case let refreshed as RefreshOutcome.Refreshed:
+    // nueva credencial activa: refreshed.credential
+    break
+case let notNeeded as RefreshOutcome.NotNeeded:
+    // no había refresh token o provider — estado sin cambios
+    break
+case let failed as RefreshOutcome.Failed:
+    // falló — sesión expirada: failed.error
+    break
+default: break
+}
+
+// Force-logout desde cualquier capa (ej. al recibir un 401)
+try await sessionController.invalidate()  // limpia credenciales, emite Invalidated
+// vs. endSession() que es logout intencional del usuario y emite Ended
+```
+
+> `credentialProvider.invalidate()` delega a `sessionController.invalidate()`. Útil cuando el auth interceptor detecta un 401 sin acceso directo al controller.
+
 ---
 
 ## ¿Necesitas configuración personalizada?
