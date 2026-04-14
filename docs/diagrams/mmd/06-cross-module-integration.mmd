@@ -1,0 +1,27 @@
+graph LR
+    subgraph sc["security-core"]
+        CP["CredentialProvider"]
+        CHM["CredentialHeaderMapper"]
+        CR["Credential"]
+        CP -->|"current()"| CR
+        CHM -->|"toHeaders()"| CR
+    end
+
+    subgraph nc["network-core"]
+        RI["RequestInterceptor"]
+        HR["HttpRequest"]
+        RI -->|"modifies"| HR
+    end
+
+    subgraph consumer["Domain Module"]
+        AI["Auth Interceptor"]
+        AI -->|"calls"| CP
+        AI -->|"calls"| CHM
+        AI -->|"implements"| RI
+    end
+
+    CHM -->|"Map String String"| AI
+
+    style sc fill:#fce4ec,stroke:#c62828
+    style nc fill:#e1f5fe,stroke:#0277bd
+    style consumer fill:#fff3e0,stroke:#ef6c00

@@ -1,0 +1,72 @@
+classDiagram
+    direction TB
+
+    class NetworkResult~T~ {
+        &lt;&lt;sealed&gt;&gt;
+        +isSuccess: Boolean
+        +isFailure: Boolean
+        +map(transform) NetworkResult~R~
+        +flatMap(transform) NetworkResult~R~
+        +fold(onSuccess, onFailure) R
+        +onSuccess(action) NetworkResult~T~
+        +onFailure(action) NetworkResult~T~
+        +getOrNull() T?
+        +errorOrNull() NetworkError?
+    }
+
+    class Success~T~ {
+        +data: T
+        +metadata: ResponseMetadata
+    }
+
+    class Failure {
+        +error: NetworkError
+    }
+
+    class ResponseMetadata {
+        +statusCode: Int
+        +headers: Map
+        +durationMs: Long
+        +requestId: String?
+        +attemptCount: Int
+    }
+
+    class NetworkError {
+        &lt;&lt;sealed&gt;&gt;
+        +message: String
+        +diagnostic: Diagnostic?
+        +isRetryable: Boolean
+    }
+
+    class Connectivity { +isRetryable = true }
+    class Timeout { +isRetryable = true }
+    class Cancelled { +isRetryable = false }
+    class Authentication { +isRetryable = false }
+    class Authorization { +isRetryable = false }
+    class ClientError { +statusCode: Int }
+    class ServerError { +statusCode: Int; isRetryable = true }
+    class Serialization { +isRetryable = false }
+    class ResponseValidation { +reason: String }
+    class Unknown { +isRetryable = false }
+
+    class Diagnostic {
+        +description: String
+        +cause: Throwable?
+        +metadata: Map
+    }
+
+    NetworkResult <|-- Success
+    NetworkResult <|-- Failure
+    Success --> ResponseMetadata
+    Failure --> NetworkError
+    NetworkError <|-- Connectivity
+    NetworkError <|-- Timeout
+    NetworkError <|-- Cancelled
+    NetworkError <|-- Authentication
+    NetworkError <|-- Authorization
+    NetworkError <|-- ClientError
+    NetworkError <|-- ServerError
+    NetworkError <|-- Serialization
+    NetworkError <|-- ResponseValidation
+    NetworkError <|-- Unknown
+    NetworkError --> Diagnostic

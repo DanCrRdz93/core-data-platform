@@ -1,0 +1,78 @@
+classDiagram
+    direction TB
+
+    class Credential {
+        &lt;&lt;sealed interface&gt;&gt;
+    }
+    class Bearer { +token: String }
+    class ApiKey { +key: String; +headerName: String }
+    class Basic { +username: String; +password: String }
+    class Custom { +type: String; +properties: Map }
+
+    class CredentialProvider {
+        &lt;&lt;interface&gt;&gt;
+        +current() Credential?
+    }
+
+    class CredentialHeaderMapper {
+        &lt;&lt;object&gt;&gt;
+        +toHeaders(credential) Map~String,String~
+    }
+
+    class SessionController {
+        &lt;&lt;interface&gt;&gt;
+        +state: StateFlow~SessionState~
+        +events: Flow~SessionEvent~
+        +startSession(credentials)
+        +refreshSession() Boolean
+        +endSession()
+    }
+
+    class SessionState {
+        &lt;&lt;sealed interface&gt;&gt;
+    }
+    class Idle
+    class Active { +credential: Credential }
+    class Expired
+
+    class SessionCredentials {
+        +credential: Credential
+        +refreshToken: String?
+        +expiresAtMs: Long?
+    }
+
+    class SecretStore {
+        &lt;&lt;interface&gt;&gt;
+        +putString(key, value)
+        +getString(key) String?
+        +putBytes(key, value)
+        +getBytes(key) ByteArray?
+        +remove(key)
+        +clear()
+        +contains(key) Boolean
+    }
+
+    class TrustPolicy {
+        &lt;&lt;interface&gt;&gt;
+        +evaluateHost(hostname) TrustEvaluation
+        +pinnedCertificates() Map
+    }
+
+    class LogSanitizer {
+        &lt;&lt;interface&gt;&gt;
+        +sanitize(key, value) String
+    }
+
+    Credential <|.. Bearer
+    Credential <|.. ApiKey
+    Credential <|.. Basic
+    Credential <|.. Custom
+    CredentialProvider --> Credential : provides
+    CredentialHeaderMapper --> Credential : converts
+    SessionController --> SessionState : exposes
+    SessionState <|.. Idle
+    SessionState <|.. Active
+    SessionState <|.. Expired
+    Active --> Credential : contains
+    SessionCredentials --> Credential : wraps
+    SessionController --> SessionCredentials : receives

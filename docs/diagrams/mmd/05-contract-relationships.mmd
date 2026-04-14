@@ -1,0 +1,61 @@
+graph LR
+    subgraph execution["Execution Pipeline"]
+        SRE["SafeRequestExecutor<br/><i>interface</i>"]
+        DSRE["DefaultSafeRequestExecutor"]
+        HE["HttpEngine<br/><i>interface</i>"]
+        KHE["KtorHttpEngine"]
+        EC["ErrorClassifier<br/><i>interface</i>"]
+        DEC["DefaultErrorClassifier<br/><i>open class</i>"]
+        KEC["KtorErrorClassifier"]
+        RV["ResponseValidator<br/><i>interface</i>"]
+        DRV["DefaultResponseValidator"]
+        RQI["RequestInterceptor<br/><i>fun interface</i>"]
+        RSI["ResponseInterceptor<br/><i>fun interface</i>"]
+        NEO["NetworkEventObserver<br/><i>interface</i>"]
+    end
+
+    subgraph result["Result Model"]
+        NR["NetworkResult T<br/><i>sealed class</i>"]
+        NRS["Success T"]
+        NRF["Failure"]
+        NE["NetworkError<br/><i>sealed class</i>"]
+        RM["ResponseMetadata"]
+        DG["Diagnostic"]
+    end
+
+    subgraph security["Security Contracts"]
+        CR["Credential<br/><i>sealed interface</i>"]
+        CP["CredentialProvider<br/><i>interface</i>"]
+        CHM["CredentialHeaderMapper<br/><i>object</i>"]
+        SC["SessionController<br/><i>interface</i>"]
+        SS["SecretStore<br/><i>interface</i>"]
+        TP["TrustPolicy<br/><i>interface</i>"]
+        LS["LogSanitizer<br/><i>interface</i>"]
+    end
+
+    SRE -.->|implements| DSRE
+    HE -.->|implements| KHE
+    EC -.->|implements| DEC
+    DEC -.->|extends| KEC
+    RV -.->|implements| DRV
+
+    DSRE --> HE
+    DSRE --> EC
+    DSRE --> RV
+    DSRE --> RQI
+    DSRE --> RSI
+    DSRE --> NEO
+
+    NR --> NRS
+    NR --> NRF
+    NRS --> RM
+    NRF --> NE
+    NE --> DG
+
+    CP --> CR
+    CHM --> CR
+    SC --> SS
+
+    style execution fill:#e1f5fe,stroke:#0277bd
+    style result fill:#e8f5e9,stroke:#2e7d32
+    style security fill:#fce4ec,stroke:#c62828

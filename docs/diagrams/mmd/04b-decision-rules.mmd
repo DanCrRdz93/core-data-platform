@@ -1,0 +1,16 @@
+flowchart TD
+    Q1{"Does it call a<br/>platform-specific API?"}
+    Q2{"Is it a configuration<br/>data class?"}
+    Q3{"Does it map to<br/>platform constants?"}
+
+    COMMON["→ commonMain"]
+    PLATFORM["→ androidMain / iosMain"]
+
+    Q1 -->|No| COMMON
+    Q1 -->|Yes| Q2
+    Q2 -->|"Yes (plain data class)"| COMMON
+    Q2 -->|"No (calls platform API)"| PLATFORM
+    Q3 -->|"Yes (enum → platform const)"| PLATFORM
+
+    style COMMON fill:#e3f2fd,stroke:#1565c0
+    style PLATFORM fill:#fff3e0,stroke:#ef6c00

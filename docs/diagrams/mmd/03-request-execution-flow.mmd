@@ -1,0 +1,56 @@
+sequenceDiagram
+    participant C as Consumer
+    participant R as Repository
+    participant DS as DataSource
+    participant E as Executor
+    participant RI as Request Interceptors
+    participant H as HttpEngine
+    participant RsI as Response Interceptors
+    participant V as Validator
+    participant CL as Classifier
+    participant O as Observers
+
+    C->>R: getUsers()
+    R->>DS: fetchUsers()
+    DS->>E: execute(HttpRequest, deserialize)
+
+    Note over E: 1. Prepare Request
+    E->>E: Merge headers + build URL
+    E->>RI: intercept(request, context)
+    RI-->>E: Modified request
+
+    Note over E: 2. Notify Start
+    E->>O: onRequestStarted()
+
+    rect rgb(240, 248, 255)
+        Note over E: 3. Retry Loop
+        E->>H: execute(request)
+        H-->>E: RawResponse
+
+        E->>RsI: intercept(response)
+        RsI-->>E: Processed response
+
+        E->>O: onResponseReceived()
+
+        E->>V: validate(response)
+        alt Valid 2xx
+            V-->>E: Valid
+            E->>E: deserialize -> T
+            E-->>DS: Success(data, metadata)
+        else Invalid
+            V-->>E: Invalid
+            E->>CL: classify(response)
+            CL-->>E: NetworkError
+            E->>O: onRequestFailed()
+            alt Retryable
+                E->>O: onRetryScheduled()
+                E->>E: delay then retry
+            else Not retryable
+                E-->>DS: Failure(error)
+            end
+        end
+    end
+
+    DS-->>R: NetworkResult of Dto
+    R->>R: map(Mapper toDomain)
+    R-->>C: NetworkResult of Model

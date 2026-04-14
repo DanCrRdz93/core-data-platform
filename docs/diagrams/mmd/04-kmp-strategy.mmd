@@ -1,0 +1,50 @@
+graph TB
+    subgraph commonMain["commonMain  -  43 files  -  95%+ of code"]
+        direction TB
+        subgraph nc_common["network-core  20 files"]
+            NC1["HttpEngine  HttpRequest  RawResponse  HttpMethod"]
+            NC2["SafeRequestExecutor  DefaultSafeRequestExecutor"]
+            NC3["RequestInterceptor  ResponseInterceptor"]
+            NC4["ErrorClassifier  DefaultErrorClassifier"]
+            NC5["NetworkEventObserver"]
+            NC6["NetworkResult  NetworkError  Diagnostic"]
+            NC7["NetworkConfig  RetryPolicy  RequestContext"]
+        end
+
+        subgraph nk_common["network-ktor  2 files"]
+            NK1["KtorHttpEngine  KtorErrorClassifier"]
+        end
+
+        subgraph sc_common["security-core  15 files"]
+            SC1["Credential  CredentialProvider  CredentialHeaderMapper"]
+            SC2["SessionController  SessionState  SessionEvent"]
+            SC3["SecretStore  TrustPolicy  LogSanitizer"]
+            SC4["SecurityError  Diagnostic  Base64"]
+        end
+
+        subgraph sa_common["sample-api  6 files"]
+            SA1["UserDto  User  UserMapper"]
+            SA2["UserRemoteDataSource  UserRepository  SampleApiFactory"]
+        end
+    end
+
+    subgraph androidMain["androidMain  -  2 files"]
+        AND1["AndroidSecretStore"]
+        AND2["AndroidStoreConfig"]
+    end
+
+    subgraph iosMain["iosMain  -  2 files"]
+        IOS1["IosSecretStore"]
+        IOS2["KeychainConfig"]
+    end
+
+    SC3 -->|implements| AND1
+    SC3 -->|implements| IOS1
+
+    style commonMain fill:#e3f2fd,stroke:#1565c0
+    style androidMain fill:#e8f5e9,stroke:#2e7d32
+    style iosMain fill:#fff3e0,stroke:#ef6c00
+    style nc_common fill:#bbdefb,stroke:#1565c0
+    style nk_common fill:#c8e6c9,stroke:#2e7d32
+    style sc_common fill:#f8bbd0,stroke:#c62828
+    style sa_common fill:#ffe0b2,stroke:#ef6c00

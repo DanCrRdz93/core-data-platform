@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="security-core">
+    <output-path>$PROJECT_DIR$/security-core/build/libs</output-path>
+    <root id="archive" name="security-core.jar">
+      <element id="module-output" name="core-data-platform.security-core.androidMain" />
+    </root>
+  </artifact>
+</component>
