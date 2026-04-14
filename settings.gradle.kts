@@ -23,7 +23,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "core-data-platform"
-include(":app")
 include(":network-core")
 include(":network-ktor")
 include(":security-core")
