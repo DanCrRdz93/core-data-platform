@@ -506,6 +506,8 @@ NetworkResult<List<User>>  ← esto es lo que recibe tu código
 
 ## Preguntas frecuentes
 
+### General
+
 **¿Necesito configurar Ktor, Retrofit, o algo de networking?**
 No. El SDK lo maneja internamente. Tú solo usas repositories.
 
@@ -542,8 +544,283 @@ class FakeUserRepository : UserRepositoryContract {
 **¿Puedo ver los logs de las requests?**
 Sí. Crea un `LoggingObserver` con tu `NetworkLogger` y pásalo al factory. Ver la sección [Logging y observabilidad](#logging-y-observabilidad).
 
+---
+
+### Seguridad
+
+**¿Cómo se almacenan las credenciales de forma segura en Android?**
+`AndroidSecretStore` usa `EncryptedSharedPreferences` respaldado por **Android Keystore**. Esto significa que los datos se cifran con AES-256-GCM y las claves criptográficas están protegidas por hardware (TEE/StrongBox cuando está disponible). Nunca se almacena nada en texto plano.
+
+**¿El SDK protege contra ataques Man-in-the-Middle (MITM)?**
+Sí, en dos niveles:
+1. **HTTPS obligatorio** — `NetworkConfig` rechaza URLs `http://` por defecto. Solo se permite HTTP con `allowInsecureConnections = true` (para desarrollo local).
+2. **Certificate Pinning** — Puedes configurar `DefaultTrustPolicy` con pins SHA-256 de tus certificados. En Android se usa `OkHttp CertificatePinner` internamente. La conexión se rechaza si ningún certificado del servidor coincide.
+
+**¿Las credenciales pueden filtrarse en logs o crash reports?**
+No. El SDK implementa múltiples capas de protección alineadas a OWASP MASVS:
+- `Credential.toString()` redacta valores sensibles con `██` (ej. `Bearer(token=██)`).
+- `HttpRequest.toString()` solo muestra keys de headers, nunca valores.
+- `RawResponse.toString()` muestra tamaño del body, no su contenido.
+- `SessionCredentials.toString()` redacta tanto la credencial como el refresh token.
+- `LoggingObserver` usa `REDACT_ALL` por defecto — todos los valores de headers se reemplazan con `██`.
+
+**¿Qué pasa si el usuario rootea el dispositivo?**
+El SDK no detecta root. Sin embargo, las credenciales almacenadas en Android Keystore están protegidas por hardware incluso en dispositivos rooteados. Las claves son **non-exportable** — el sistema las usa internamente pero nunca las expone. Si necesitas detección de root, agrégala en tu capa de app (ej. SafetyNet/Play Integrity) y usa `sessionController.invalidate()` si detectas compromiso.
+
+**¿Los datos del SDK se incluyen en backups de Android?**
+`EncryptedSharedPreferences` cifra todo su contenido, por lo que un backup contendría datos cifrados ilegibles sin acceso al Keystore del dispositivo original. Para máxima seguridad, puedes excluir el archivo de backups en tu `AndroidManifest.xml` con `android:fullBackupContent`.
+
+**¿Qué pasa si un certificado del servidor rota y tengo pinning activo?**
+La app no podrá conectarse hasta que actualices los pins. Por eso es **obligatorio** incluir al menos un pin de respaldo (backup pin) en tu `DefaultTrustPolicy`. Cuando rotas un certificado, primero despliega una versión de la app con el nuevo pin como backup, luego rota el certificado en el servidor.
+
+**¿Puedo desactivar certificate pinning para debugging?**
+Sí. Simplemente no pases un `TrustPolicy` al crear el engine:
+```kotlin
+// Sin pinning (dev/debug)
+val engine = KtorHttpEngine.create(config)
+
+// Con pinning (producción)
+val engine = KtorHttpEngine.create(config, trustPolicy = myTrustPolicy)
+```
+No uses el flag `allowInsecureConnections` para esto — ese flag desactiva la validación HTTPS completa y solo debe usarse para `localhost`.
+
+**¿Necesito configurar Network Security Config de Android?**
+No para el SDK en sí — el SDK impone HTTPS por defecto en `NetworkConfig`. Sin embargo, si usas `allowInsecureConnections = true` para desarrollo local y tu `targetSdk >= 28`, necesitarás un `network_security_config.xml` que permita cleartext para `localhost`/`10.0.2.2`:
+```xml
+<!-- res/xml/network_security_config.xml -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>
+```
+
+**¿Cómo invalido la sesión si detecto una vulnerabilidad en runtime?**
+Llama a `sessionController.invalidate()` desde cualquier parte de tu app. Esto:
+1. Cambia el estado a `SessionState.Idle`.
+2. Emite `SessionEvent.Invalidated`.
+3. Borra las credenciales de `SecretStore`.
+
+```kotlin
+// Ejemplo: invalidar si detectas tamper
+if (integrityCheck.isTampered()) {
+    sessionController.invalidate()
+    navigateToLogin()
+}
+```
+
+---
+
+### Implementación
+
+**¿Puedo usar múltiples APIs con diferentes URLs base?**
+Sí. Crea un `NetworkConfig` y un `DefaultSafeRequestExecutor` separado para cada API. Nunca compartas un executor entre APIs con diferente `baseUrl`:
+```kotlin
+val mainApi = NetworkConfig(baseUrl = "https://api.tuempresa.com/v1", ...)
+val authApi = NetworkConfig(baseUrl = "https://auth.tuempresa.com/v1", ...)
+
+val mainExecutor = DefaultSafeRequestExecutor(engine = KtorHttpEngine.create(mainApi), config = mainApi, ...)
+val authExecutor = DefaultSafeRequestExecutor(engine = KtorHttpEngine.create(authApi), config = authApi, ...)
+```
+
+**¿Cómo agrego headers custom a una request específica?**
+Agrega headers en el `HttpRequest`. Estos se combinan con los `defaultHeaders` de `NetworkConfig` (los del request tienen prioridad):
+```kotlin
+val request = HttpRequest(
+    path = "/users",
+    method = HttpMethod.GET,
+    headers = mapOf("X-Custom-Header" to "valor")
+)
+```
+
+**¿Cómo implemento paginación?**
+Construye la request con query parameters para la página:
+```kotlin
+suspend fun fetchUsers(page: Int, size: Int): NetworkResult<List<UserDto>> = execute(
+    request = HttpRequest(
+        path = "/users?page=$page&size=$size",
+        method = HttpMethod.GET
+    ),
+    deserialize = { json.decodeFromString(it.body!!.decodeToString()) }
+)
+```
+En el repository, acumula resultados o usa `flatMap` para encadenar páginas.
+
+**¿Qué pasa si el servidor retorna 204 No Content (body vacío)?**
+El force-unwrap `response.body!!` fallará y recibirás `NetworkError.Serialization`. Protege contra bodies nulos:
+```kotlin
+deserialize = { response ->
+    val body = response.body?.decodeToString()
+        ?: return@execute Unit  // o tu tipo vacío
+    json.decodeFromString(body)
+}
+```
+
+**¿Puedo cancelar una request en curso?**
+Sí. Cancela la coroutine o el `Job` que la lanzó. Ktor propaga la cancelación correctamente y recibirás `NetworkError.Cancelled`:
+```kotlin
+val job = viewModelScope.launch {
+    repository.getUsers().fold(
+        onSuccess = { /* ... */ },
+        onFailure = { /* ... */ }
+    )
+}
+// Después:
+job.cancel()  // la request se cancela, recibes NetworkError.Cancelled
+```
+
+**¿El SDK maneja automáticamente el refresh de tokens?**
+El SDK llama a `credentialProvider.current()` antes de cada request. Si usas `DefaultCredentialProvider` + `DefaultSessionController`, el refresh se puede disparar proactivamente con `sessionController.refreshSession()`. Sin embargo, el SDK **no** hace refresh automático al recibir un 401 — eso es responsabilidad de tu capa de app. Patrón recomendado:
+```kotlin
+result.onFailure { error ->
+    if (error is NetworkError.Authentication) {
+        val outcome = sessionController.refreshSession()
+        if (outcome is RefreshOutcome.Refreshed) {
+            // Re-ejecutar la request original
+        } else {
+            navigateToLogin()
+        }
+    }
+}
+```
+
+**¿Puedo agregar interceptors custom?**
+Sí. Implementa `RequestInterceptor` (pre-transport) o `ResponseInterceptor` (post-transport):
+```kotlin
+// Request interceptor: agrega un trace ID a cada request
+val tracingInterceptor = RequestInterceptor { request, context ->
+    request.copy(headers = request.headers + ("X-Trace-Id" to UUID.randomUUID().toString()))
+}
+
+// Response interceptor: extrae un header de la respuesta
+val headerExtractor = ResponseInterceptor { response, request, context ->
+    val rateLimitRemaining = response.headers["X-RateLimit-Remaining"]
+    // guardar para uso posterior
+    response
+}
+```
+
+**¿Puedo hacer requests POST con body JSON?**
+Sí. Serializa tu objeto a JSON y pásalo como `body`:
+```kotlin
+val orderJson = json.encodeToString(CreateOrderRequest(item = "abc", quantity = 2))
+val request = HttpRequest(
+    path = "/orders",
+    method = HttpMethod.POST,
+    headers = mapOf("Content-Type" to "application/json"),
+    body = orderJson.encodeToByteArray()
+)
+```
+
+**¿Cuántas instancias de `KtorHttpEngine` debería crear?**
+Una por `NetworkConfig` (URL base). Crea el engine al inicio de la app, regístralo como singleton en tu DI, y compártelo entre todos los data sources de esa API. Llama a `engine.close()` al cerrar la app.
+
+**¿`ignoreUnknownKeys = true` es seguro? ¿No oculta problemas?**
+Es la práctica recomendada para resiliencia ante evolución del API. Si el backend agrega un campo nuevo, tu app no se rompe. Los campos que **faltan** en tu DTO sí causan error — eso se detecta como `NetworkError.Serialization` y es una señal crítica (desajuste de contrato).
+
+---
+
+### Configuración
+
+**¿Puedo usar HTTP para desarrollo local?**
+Sí, pero debe ser explícito:
+```kotlin
+val devConfig = NetworkConfig(
+    baseUrl = "http://10.0.2.2:8080",  // emulador Android → localhost del host
+    allowInsecureConnections = true     // ⚠️ SOLO para desarrollo local
+)
+```
+Nunca actives `allowInsecureConnections` en producción. El SDK lanzará `IllegalArgumentException` si usas `http://` sin este flag.
+
+**¿Cómo configuro diferentes ambientes (dev/staging/prod)?**
+Define objetos de configuración por entorno y selecciona en tiempo de compilación:
+```kotlin
+val config = when (BuildConfig.FLAVOR) {
+    "dev"     -> NetworkConfig(baseUrl = "https://dev-api.com/v1", retryPolicy = RetryPolicy.None)
+    "staging" -> NetworkConfig(baseUrl = "https://staging-api.com/v1", retryPolicy = RetryPolicy.ExponentialBackoff(maxRetries = 2))
+    else      -> NetworkConfig(baseUrl = "https://api.com/v1", retryPolicy = RetryPolicy.ExponentialBackoff(maxRetries = 3))
+}
+```
+Ver `docs/integration-guide.md` sección [Configuración Multi-Entorno](#) para un ejemplo completo.
+
+**¿Cuáles son los timeouts por defecto?**
+| Parámetro | Default |
+|---|---|
+| `connectTimeout` | 30 segundos |
+| `readTimeout` | 30 segundos |
+| `writeTimeout` | 30 segundos |
+
+Ajústalos según tu API. Para APIs lentas (reportes, uploads), considera timeouts más altos. Para APIs rápidas (lookups), usa timeouts más cortos para fallar rápido.
+
+**¿Qué errores se reintentan automáticamente?**
+Solo los que tienen `isRetryable = true`:
+| Error | ¿Reintentable? | Razón |
+|---|---|---|
+| `Connectivity` | ✅ Sí | Puede ser transitorio (red intermitente) |
+| `Timeout` | ✅ Sí | El servidor pudo estar ocupado temporalmente |
+| `ServerError` (5xx) | ✅ Sí | El servidor puede recuperarse |
+| `Authentication` (401) | ❌ No | Requiere intervención del usuario o refresh |
+| `Authorization` (403) | ❌ No | El usuario no tiene permisos |
+| `ClientError` (4xx) | ❌ No | La request es inválida |
+| `Serialization` | ❌ No | Desajuste de contrato (no transitorio) |
+| `Cancelled` | ❌ No | Acción intencional del usuario |
+
+**¿Puedo configurar retry solo para ciertos endpoints?**
+No directamente — `RetryPolicy` se aplica a nivel de `NetworkConfig` (todas las requests del executor). Si necesitas comportamiento diferente, crea dos executors: uno con retry para operaciones idempotentes (GET) y otro sin retry para operaciones que mutan estado (POST).
+
+---
+
+### Vulnerabilidades y hardening
+
+**¿Qué pasa si alguien descompila la app y ve las API keys?**
+Las API keys hardcodeadas en código son siempre vulnerables a ingeniería inversa, con o sin el SDK. El SDK mitiga esto de varias formas:
+1. **`AndroidSecretStore`** almacena credenciales cifradas — no en código.
+2. **`Credential.toString()` redacta valores** — no aparecen en dumps de memoria.
+3. Para keys que deben estar en la app, usa `BuildConfig` + ofuscación.
+
+La mejor práctica es que las API keys sensibles se obtengan vía un endpoint autenticado, no embebidas en el binario.
+
+**¿Necesito ProGuard/R8 rules para el SDK?**
+El SDK está construido como módulo KMP y usa `kotlinx.serialization` (que ya maneja ofuscación correctamente vía sus plugins). No necesitas reglas ProGuard adicionales para el SDK. Sin embargo, asegúrate de que el plugin de serialización esté aplicado — si no, R8 puede strip las anotaciones `@Serializable` y romper la deserialización.
+
+**¿El SDK sanitiza datos sensibles en los logs de métricas y trazas?**
+Sí. Además del `LoggingObserver`:
+- `MetricsObserver` y `TracingObserver` usan `sanitizePath()` para strip query parameters de los paths antes de emitir tags (evita filtrar IDs, tokens en query strings).
+- `NetworkLogger.NOOP` es el default — el SDK no imprime nada a menos que tú configures un logger.
+
+**¿Cómo evito que información interna de `diagnostic` se muestre al usuario?**
+Nunca uses `error.diagnostic?.description` en la UI. Usa siempre `error.message`:
+```kotlin
+// ✅ SEGURO — message es user-facing
+showSnackbar(error.message)  // "Unable to reach the server"
+
+// ❌ INSEGURO — diagnostic contiene stack traces e info interna
+showSnackbar(error.diagnostic?.description ?: "Error")  // "java.net.UnknownHostException: ..."
+```
+`diagnostic` es solo para logging interno y debugging. `message` siempre es seguro y legible.
+
+**¿El SDK protege contra replay attacks?**
+El SDK no implementa protección anti-replay directamente (eso es responsabilidad del backend). Sin embargo, puedes agregar un nonce o timestamp vía un `RequestInterceptor`:
+```kotlin
+val antiReplayInterceptor = RequestInterceptor { request, _ ->
+    request.copy(headers = request.headers + mapOf(
+        "X-Request-Nonce" to UUID.randomUUID().toString(),
+        "X-Request-Timestamp" to System.currentTimeMillis().toString()
+    ))
+}
+```
+
+**¿El SDK es vulnerable a SSL stripping?**
+No, si usas la configuración por defecto. `NetworkConfig` rechaza URLs `http://` por defecto. Además, si configuras `DefaultTrustPolicy` con certificate pinning, un atacante no podría interceptar la conexión ni con un certificado CA falso.
+
+---
+
+### Documentación
+
 **¿Dónde está la documentación completa?**
-- `docs/integration-guide.md` — Guía completa de integración
+- `docs/integration-guide.md` — Guía completa de integración paso a paso
+- `docs/security-checklist.md` — Checklist OWASP MASVS con todas las protecciones
 - `network-core/README.md` — Contratos y pipeline de ejecución
 - `security-core/README.md` — Credenciales, sesiones, almacenamiento seguro
 - `docs/diagrams/` — Diagramas de arquitectura (SVG)
