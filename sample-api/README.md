@@ -348,9 +348,10 @@ kotlin {
     // targets...
     sourceSets {
         commonMain.dependencies {
-            implementation(project(":network-core"))
-            implementation(project(":network-ktor"))
-            implementation(project(":security-core"))
+            // SDK desde Maven Central
+            implementation("io.github.dancrrdz93:network-core:0.1.0")
+            implementation("io.github.dancrrdz93:network-ktor:0.1.0")
+            implementation("io.github.dancrrdz93:security-core:0.1.0")
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
         }
@@ -397,11 +398,19 @@ kotlin {
 
 ## Dependencias
 
+### Maven Central
+
+```kotlin
+implementation("io.github.dancrrdz93:sample-api:0.1.0")
+```
+
+### Dependencias transitivas
+
 ```kotlin
 // commonMain
-implementation(project(":network-core"))
-implementation(project(":network-ktor"))
-implementation(project(":security-core"))
+implementation("io.github.dancrrdz93:network-core:0.1.0")
+implementation("io.github.dancrrdz93:network-ktor:0.1.0")
+implementation("io.github.dancrrdz93:security-core:0.1.0")
 implementation(libs.kotlinx.coroutines.core)        // 1.10.1
 implementation(libs.kotlinx.serialization.json)      // 1.7.3
 ```

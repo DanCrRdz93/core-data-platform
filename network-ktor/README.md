@@ -253,9 +253,17 @@ Cambia la dependencia en módulos de dominio de `:network-ktor` a `:network-okht
 
 ## Dependencias
 
+### Maven Central
+
+```kotlin
+implementation("io.github.dancrrdz93:network-ktor:0.1.0")
+```
+
+### Dependencias transitivas
+
 ```kotlin
 // commonMain
-implementation(project(":network-core"))
+implementation("io.github.dancrrdz93:network-core:0.1.0")
 implementation(libs.ktor.client.core)          // io.ktor:ktor-client-core:3.0.3
 
 // androidMain

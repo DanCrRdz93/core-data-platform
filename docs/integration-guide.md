@@ -51,27 +51,31 @@ Deberías estar familiarizado con:
 
 ## Agregar Dependencias
 
-### Paso 1: Registrar los módulos del SDK
+### Paso 1: Agregar dependencias del SDK
 
-Si el SDK vive como un composite build local o módulos incluidos, agrégalos a tu `settings.gradle.kts`:
+El SDK está publicado en **Maven Central**. Agrega las dependencias en tu `build.gradle.kts`:
+
+```kotlin
+// build.gradle.kts de tu módulo de dominio
+dependencies {
+    implementation("io.github.dancrrdz93:network-core:0.1.0")
+    implementation("io.github.dancrrdz93:network-ktor:0.1.0")
+    implementation("io.github.dancrrdz93:security-core:0.1.0")
+}
+```
+
+Asegúrate de que `mavenCentral()` esté en tus repositorios (viene por defecto en la mayoría de proyectos):
 
 ```kotlin
 // settings.gradle.kts
-include(":network-core")
-include(":network-ktor")
-include(":security-core")
-```
-
-Si el SDK está publicado en un repositorio Maven, usa coordenadas (reemplaza con tu grupo/versión real):
-
-```kotlin
-// build.gradle.kts of your domain module
-dependencies {
-    implementation("com.dancr.platform:network-core:1.0.0")
-    implementation("com.dancr.platform:network-ktor:1.0.0")
-    implementation("com.dancr.platform:security-core:1.0.0")
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+    }
 }
 ```
+
+Si el SDK vive como módulos locales de tu proyecto, usa `implementation(project(":network-core"))` en su lugar.
 
 ### Paso 2: Agregar dependencias a tu módulo de dominio
 
@@ -96,10 +100,10 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            // Módulos del SDK
-            implementation(project(":network-core"))
-            implementation(project(":network-ktor"))
-            implementation(project(":security-core"))
+            // Módulos del SDK (Maven Central)
+            implementation("io.github.dancrrdz93:network-core:0.1.0")
+            implementation("io.github.dancrrdz93:network-ktor:0.1.0")
+            implementation("io.github.dancrrdz93:security-core:0.1.0")
 
             // Requerido para coroutines
             implementation(libs.kotlinx.coroutines.core)

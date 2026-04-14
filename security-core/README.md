@@ -492,6 +492,14 @@ class ProductionTrustPolicy : TrustPolicy {
 
 ## Dependencias
 
+### Maven Central
+
+```kotlin
+implementation("io.github.dancrrdz93:security-core:0.1.0")
+```
+
+### Dependencia transitiva
+
 ```toml
 # Única dependencia — sin networking, sin serialización
 [dependencies]

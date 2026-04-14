@@ -444,6 +444,14 @@ class MetricsObserver(private val client: MetricsClient) : NetworkEventObserver 
 
 ## Dependencias
 
+### Maven Central
+
+```kotlin
+implementation("io.github.dancrrdz93:network-core:0.1.0")
+```
+
+### Dependencia transitiva
+
 ```toml
 # Única dependencia — sin cliente HTTP, sin serialización
 [dependencies]

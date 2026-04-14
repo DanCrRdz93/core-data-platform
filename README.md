@@ -1,6 +1,7 @@
 # Core Data Platform
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Maven Central](https://img.shields.io/maven-central/v/io.github.dancrrdz93/network-core)
 
 **SDK Kotlin Multiplatform para Acceso Remoto Seguro de Datos**
 
@@ -12,6 +13,7 @@ Una librería Kotlin Multiplatform (KMP) reutilizable y modular diseñada para p
 
 - [Documentación](#documentación)
 - [Quick Start](#quick-start)
+- [Instalación](#instalación)
 - [Resumen](#resumen)
 - [Objetivos del Proyecto](#objetivos-del-proyecto)
 - [Arquitectura](#arquitectura)
@@ -96,6 +98,34 @@ Para configuración avanzada (auth, timeouts personalizados, interceptors), cons
 
 ---
 
+## Instalación
+
+El SDK está publicado en **Maven Central**. Agrega los módulos que necesites en tu `build.gradle.kts`:
+
+```kotlin
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Contratos core (siempre requeridos)
+    implementation("io.github.dancrrdz93:network-core:0.1.0")
+
+    // Implementación de transporte HTTP (elige uno)
+    implementation("io.github.dancrrdz93:network-ktor:0.1.0")
+
+    // Seguridad (auth, almacenamiento seguro, gestión de sesiones)
+    implementation("io.github.dancrrdz93:security-core:0.1.0")
+
+    // Módulo de referencia (opcional — para ver el patrón de integración)
+    implementation("io.github.dancrrdz93:sample-api:0.1.0")
+}
+```
+
+Si el SDK se consume como módulo local (composite build), usa `implementation(project(":network-core"))` en su lugar.
+
+---
+
 ## Resumen
 
 Core Data Platform es un SDK interno construido con Kotlin Multiplatform que provee una base unificada, segura y extensible para hacer llamadas a APIs remotas desde aplicaciones móviles. Está diseñado para ser consumido por múltiples apps a gran escala sin acoplarlas a ningún cliente HTTP, librería de serialización o contrato de backend específico.
@@ -165,7 +195,7 @@ Mantenerlos independientes significa:
 │                                                              │
 │   ┌──────────┐  ┌──────────┐  ┌──────────┐                   │
 │   │ Feature A│  │ Feature B│  │ Feature C│  ← App layers     │
-│   └────┬─────┘  └────┬─────┘  └────┬─────┘                   │
+│   └────┬─────┘  └─────┬────┘  └──────┬───┘                   │
 │        │              │              │                       │
 │   ┌────▼──────────────▼──────────────▼────┐                  │
 │   │        Domain API Modules             │  ← :payments-api │
@@ -384,18 +414,20 @@ En el `build.gradle.kts` de tu app:
 ```kotlin
 dependencies {
     // Contratos core (siempre requeridos)
-    implementation(project(":network-core"))
+    implementation("io.github.dancrrdz93:network-core:0.1.0")
 
     // Implementación de transporte (elige uno)
-    implementation(project(":network-ktor"))
+    implementation("io.github.dancrrdz93:network-ktor:0.1.0")
 
     // Seguridad (si necesitas auth, almacenamiento seguro o gestión de sesiones)
-    implementation(project(":security-core"))
+    implementation("io.github.dancrrdz93:security-core:0.1.0")
 
     // Serialización (en tus módulos de dominio)
     implementation(libs.kotlinx.serialization.json)
 }
 ```
+
+> Si el SDK es un módulo local de tu proyecto, usa `implementation(project(":network-core"))` en su lugar.
 
 ### 2. Define tu configuración
 

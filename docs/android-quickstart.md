@@ -35,8 +35,10 @@ Tú solo interactúas con **repositorios** que devuelven modelos de dominio limp
 │  • Adapter implementa UserRepositoryContract    │
 │  • AndroidSecretStore para almacenamiento seguro│
 ├─────────────────────────────────────────────────┤
-│  Core Data Platform SDK (dependencia Gradle)    │
-│  • network-core, network-ktor, security-core    │
+│  Core Data Platform SDK (Maven Central)         │
+│  io.github.dancrrdz93:network-core:0.1.0       │
+│  io.github.dancrrdz93:network-ktor:0.1.0       │
+│  io.github.dancrrdz93:security-core:0.1.0      │
 └─────────────────────────────────────────────────┘
 ```
 
