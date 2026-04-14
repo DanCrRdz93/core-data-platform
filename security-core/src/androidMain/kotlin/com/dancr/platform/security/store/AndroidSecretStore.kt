@@ -87,6 +87,32 @@ class AndroidSecretStore(
         }
     }
 
+    override suspend fun keys(): Set<String> = runOnDisk {
+        try {
+            val prefix = config.keyPrefix
+            prefs.all.keys
+                .filter { it.startsWith(prefix) }
+                .map { it.removePrefix(prefix) }
+                .toSet()
+        } catch (e: Exception) {
+            throw mapException(e)
+        }
+    }
+
+    override suspend fun putStringIfAbsent(key: String, value: String): Boolean = runOnDisk {
+        try {
+            val prefixed = prefixedKey(key)
+            if (prefs.contains(prefixed)) {
+                false
+            } else {
+                prefs.edit().putString(prefixed, value).apply()
+                true
+            }
+        } catch (e: Exception) {
+            throw mapException(e)
+        }
+    }
+
     // -- Internal helpers --
 
     private fun prefixedKey(key: String): String = "${config.keyPrefix}$key"

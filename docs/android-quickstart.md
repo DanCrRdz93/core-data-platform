@@ -283,6 +283,27 @@ El SDK automáticamente:
 - Convierte el `Credential` al header correcto
 - Si no hay sesión activa, la request va sin auth
 
+### Refresh, invalidación y estado de sesión
+
+```kotlin
+// Consultar si hay sesión activa (derivado del estado, nunca estado duplicado)
+if (sessionController.isAuthenticated) { /* ... */ }
+
+// Refresh proactivo (ej. antes de que expire el token)
+val outcome = sessionController.refreshSession()
+when (outcome) {
+    is RefreshOutcome.Refreshed  -> { /* nueva credencial activa */ }
+    is RefreshOutcome.NotNeeded  -> { /* no había refresh token o provider — estado sin cambios */ }
+    is RefreshOutcome.Failed     -> { /* falló — sesión expirada */ }
+}
+
+// Force-logout desde cualquier capa (ej. al recibir un 401)
+sessionController.invalidate()  // limpia credenciales, emite Invalidated
+// vs. endSession() que es logout intencional del usuario y emite Ended
+```
+
+> `credentialProvider.invalidate()` delega a `sessionController.invalidate()`. Útil cuando el auth interceptor detecta un 401 sin acceso directo al controller.
+
 ---
 
 ## ¿Necesitas configuración personalizada?

@@ -33,22 +33,17 @@ class DefaultSessionController(
         _events.emit(SessionEvent.Started)
     }
 
-    override suspend fun refreshSession(): Boolean = mutex.withLock {
+    override suspend fun refreshSession(): RefreshOutcome = mutex.withLock {
         val refreshToken = store.getString(KEY_REFRESH_TOKEN)
         val provider = refreshTokenProvider
 
         if (refreshToken == null || provider == null) {
-            val error = SecurityError.TokenRefreshFailed(
-                diagnostic = Diagnostic(
-                    description = when {
-                        refreshToken == null -> "No refresh token available"
-                        else -> "No refresh token provider configured"
-                    }
-                )
-            )
-            _state.value = SessionState.Expired
-            _events.emit(SessionEvent.RefreshFailed(error))
-            return false
+            val reason = when {
+                refreshToken == null -> "No refresh token available"
+                else -> "No refresh token provider configured"
+            }
+            // State unchanged — NotNeeded means "preconditions not met, nothing happened".
+            return RefreshOutcome.NotNeeded(reason)
         }
 
         return try {
@@ -57,27 +52,25 @@ class DefaultSessionController(
                 persistCredentials(newCredentials)
                 _state.value = SessionState.Active(newCredentials.credential)
                 _events.emit(SessionEvent.Refreshed)
-                true
+                RefreshOutcome.Refreshed(newCredentials.credential)
             } else {
+                val error = SecurityError.TokenRefreshFailed(
+                    diagnostic = Diagnostic(description = "Refresh provider returned null")
+                )
                 _state.value = SessionState.Expired
-                _events.emit(SessionEvent.RefreshFailed(
-                    SecurityError.TokenRefreshFailed(
-                        diagnostic = Diagnostic(description = "Refresh provider returned null")
-                    )
-                ))
-                false
+                _events.emit(SessionEvent.RefreshFailed(error))
+                RefreshOutcome.Failed(error)
             }
         } catch (e: Exception) {
-            _state.value = SessionState.Expired
-            _events.emit(SessionEvent.RefreshFailed(
-                SecurityError.TokenRefreshFailed(
-                    diagnostic = Diagnostic(
-                        description = e.message ?: "Token refresh failed",
-                        cause = e
-                    )
+            val error = SecurityError.TokenRefreshFailed(
+                diagnostic = Diagnostic(
+                    description = e.message ?: "Token refresh failed",
+                    cause = e
                 )
-            ))
-            false
+            )
+            _state.value = SessionState.Expired
+            _events.emit(SessionEvent.RefreshFailed(error))
+            RefreshOutcome.Failed(error)
         }
     }
 
@@ -85,6 +78,12 @@ class DefaultSessionController(
         clearPersistedCredentials()
         _state.value = SessionState.Idle
         _events.emit(SessionEvent.Ended)
+    }
+
+    override suspend fun invalidate(): Unit = mutex.withLock {
+        clearPersistedCredentials()
+        _state.value = SessionState.Idle
+        _events.emit(SessionEvent.Invalidated)
     }
 
     // -- Persistence helpers --
