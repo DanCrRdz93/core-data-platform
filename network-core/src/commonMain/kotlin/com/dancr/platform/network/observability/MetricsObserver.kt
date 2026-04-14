@@ -70,9 +70,13 @@ class MetricsObserver(
     private fun baseTags(request: HttpRequest, context: RequestContext?): Map<String, String> =
         buildMap {
             put("method", request.method.name)
-            put("path", request.path)
+            put("path", sanitizePath(request.path))
             context?.operationId?.let { put("operation", it) }
         }
+
+    // OWASP MASVS-PRIVACY: strip query parameters from paths to prevent
+    // accidental token/secret leakage through metrics backends.
+    private fun sanitizePath(path: String): String = path.substringBefore("?")
 
     private fun errorType(error: NetworkError): String =
         error::class.simpleName ?: "Unknown"

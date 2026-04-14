@@ -5,8 +5,8 @@ import com.dancr.platform.network.client.HttpMethod
 import com.dancr.platform.network.client.HttpRequest
 import com.dancr.platform.network.client.RawResponse
 import com.dancr.platform.network.config.NetworkConfig
+import com.dancr.platform.security.trust.TrustPolicy
 import io.ktor.client.HttpClient
-import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
@@ -65,26 +65,16 @@ class KtorHttpEngine(
 
     companion object {
 
-        fun create(config: NetworkConfig): KtorHttpEngine {
-            val client = HttpClient {
-                install(HttpTimeout) {
-                    connectTimeoutMillis = config.connectTimeout.inWholeMilliseconds
-                    requestTimeoutMillis = config.readTimeout.inWholeMilliseconds
-                    socketTimeoutMillis = config.writeTimeout.inWholeMilliseconds
-                }
-
-                // Future: Certificate pinning integration.
-                //  Accept TrustPolicy from security-core and configure platform TLS:
-                //  - Android (OkHttp): CertificatePinner via engine { config { certificatePinner(...) } }
-                //  - iOS (Darwin): SecTrust evaluation via handleChallenge in NSURLSessionDelegate
-                //  This requires platform-specific source sets (androidMain / iosMain) in this module.
-
-                // Note: Request/response logging is handled by LoggingObserver at the
-                //  executor level. Ktor's Logging plugin is not needed unless deep
-                //  transport-level debugging (raw wire bytes) is required.
-
-                expectSuccess = false
-            }
+        // Creates a KtorHttpEngine with platform-appropriate TLS configuration.
+        // When trustPolicy is non-null, certificate pinning is enforced:
+        //  - Android (OkHttp): via CertificatePinner
+        //  - iOS (Darwin): via handleChallenge with SecTrust evaluation
+        // When trustPolicy is null, system default trust is used (no pinning).
+        fun create(
+            config: NetworkConfig,
+            trustPolicy: TrustPolicy? = null
+        ): KtorHttpEngine {
+            val client = createPlatformHttpClient(config, trustPolicy)
             return KtorHttpEngine(client)
         }
     }

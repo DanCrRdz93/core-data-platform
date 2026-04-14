@@ -1,29 +1,27 @@
 package com.dancr.platform.security.store
 
 import com.dancr.platform.security.error.Diagnostic
+import com.dancr.platform.security.error.SecureStorageException
 import com.dancr.platform.security.error.SecurityError
 import kotlinx.cinterop.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
-import platform.Foundation.NSData
-import platform.Foundation.NSMutableDictionary
-import platform.Foundation.NSString
-import platform.Foundation.NSUTF8StringEncoding
-import platform.Foundation.create
-import platform.Foundation.dataUsingEncoding
-import platform.Foundation.setValue
+import platform.CoreFoundation.CFDictionaryRef
+import platform.CoreFoundation.CFRelease
+import platform.CoreFoundation.CFTypeRef
+import platform.CoreFoundation.CFTypeRefVar
+import platform.Foundation.*
 import platform.Security.*
 
+@OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 class IosSecretStore(
     private val config: KeychainConfig = KeychainConfig()
 ) : SecretStore {
 
     override suspend fun putString(key: String, value: String): Unit = runSecure {
         val data = (value as NSString).dataUsingEncoding(NSUTF8StringEncoding)
-            ?: throw SecurityError.SecureStorageFailure(
-                diagnostic = Diagnostic(description = "Failed to encode string to NSData")
-            )
+            ?: throw storageException("Failed to encode string to NSData")
         putData(key, data)
     }
 
@@ -45,10 +43,11 @@ class IosSecretStore(
     }
 
     override suspend fun remove(key: String): Unit = runSecure {
-        val query = baseQuery(key)
-        val status = SecItemDelete(query)
-        if (status != errSecSuccess && status != errSecItemNotFound) {
-            throw mapOSStatus(status.toInt(), "delete")
+        baseQuery(key).useCF { cfQuery ->
+            val status = SecItemDelete(cfQuery)
+            if (status != errSecSuccess && status != errSecItemNotFound) {
+                throw mapOSStatus(status.toInt(), "delete")
+            }
         }
     }
 
@@ -57,9 +56,11 @@ class IosSecretStore(
             setValue(kSecClassGenericPassword, forKey = kSecClass as String)
             setValue(config.serviceName, forKey = kSecAttrService as String)
         }
-        val status = SecItemDelete(query)
-        if (status != errSecSuccess && status != errSecItemNotFound) {
-            throw mapOSStatus(status.toInt(), "clear")
+        query.useCF { cfQuery ->
+            val status = SecItemDelete(cfQuery)
+            if (status != errSecSuccess && status != errSecItemNotFound) {
+                throw mapOSStatus(status.toInt(), "clear")
+            }
         }
     }
 
@@ -67,33 +68,37 @@ class IosSecretStore(
         val query = baseQuery(key).apply {
             setValue(kSecMatchLimitOne, forKey = kSecMatchLimit as String)
         }
-        val status = SecItemCopyMatching(query, null)
-        when (status) {
-            errSecSuccess -> true
-            errSecItemNotFound -> false
-            else -> throw mapOSStatus(status.toInt(), "contains")
+        query.useCF { cfQuery ->
+            val status = SecItemCopyMatching(cfQuery, null)
+            when (status) {
+                errSecSuccess -> true
+                errSecItemNotFound -> false
+                else -> throw mapOSStatus(status.toInt(), "contains")
+            }
         }
     }
 
-    @OptIn(ExperimentalForeignApi::class)
     override suspend fun keys(): Set<String> = runSecure {
         val query = NSMutableDictionary().apply {
             setValue(kSecClassGenericPassword, forKey = kSecClass as String)
             setValue(config.serviceName, forKey = kSecAttrService as String)
-            setValue(kCFBooleanTrue, forKey = kSecReturnAttributes as String)
+            setValue(true, forKey = kSecReturnAttributes as String)
             setValue(kSecMatchLimitAll, forKey = kSecMatchLimit as String)
         }
-        memScoped {
-            val result = alloc<ObjCObjectVar<*>>()
-            val status = SecItemCopyMatching(query, result.ptr)
-            when (status) {
-                errSecSuccess -> {
-                    @Suppress("UNCHECKED_CAST")
-                    val items = result.value as? List<Map<String, Any?>> ?: return@runSecure emptySet()
-                    items.mapNotNull { it[kSecAttrAccount as String] as? String }.toSet()
+        query.useCF { cfQuery ->
+            memScoped {
+                val result = alloc<CFTypeRefVar>()
+                val status = SecItemCopyMatching(cfQuery, result.ptr)
+                when (status) {
+                    errSecSuccess -> {
+                        val nsResult = CFBridgingRelease(result.value)
+                        @Suppress("UNCHECKED_CAST")
+                        val items = nsResult as? List<Map<String, Any?>> ?: return@useCF emptySet()
+                        items.mapNotNull { it[kSecAttrAccount as String] as? String }.toSet()
+                    }
+                    errSecItemNotFound -> emptySet()
+                    else -> throw mapOSStatus(status.toInt(), "keys")
                 }
-                errSecItemNotFound -> emptySet()
-                else -> throw mapOSStatus(status.toInt(), "keys")
             }
         }
     }
@@ -103,9 +108,7 @@ class IosSecretStore(
             false
         } else {
             val data = (value as NSString).dataUsingEncoding(NSUTF8StringEncoding)
-                ?: throw SecurityError.SecureStorageFailure(
-                    diagnostic = Diagnostic(description = "Failed to encode string to NSData")
-                )
+                ?: throw storageException("Failed to encode string to NSData")
             putData(key, data)
             true
         }
@@ -117,30 +120,38 @@ class IosSecretStore(
         val query = baseQuery(key).apply {
             setValue(data, forKey = kSecValueData as String)
         }
-        var status = SecItemAdd(query, null)
-        if (status == errSecDuplicateItem) {
-            val updateAttrs = NSMutableDictionary().apply {
-                setValue(data, forKey = kSecValueData as String)
+        query.useCF { cfQuery ->
+            var status = SecItemAdd(cfQuery, null)
+            if (status == errSecDuplicateItem) {
+                baseQuery(key).useCF { cfBase ->
+                    val updateAttrs = NSMutableDictionary().apply {
+                        setValue(data, forKey = kSecValueData as String)
+                    }
+                    updateAttrs.useCF { cfUpdate ->
+                        status = SecItemUpdate(cfBase, cfUpdate)
+                    }
+                }
             }
-            status = SecItemUpdate(baseQuery(key), updateAttrs)
-        }
-        if (status != errSecSuccess) {
-            throw mapOSStatus(status.toInt(), "put")
+            if (status != errSecSuccess) {
+                throw mapOSStatus(status.toInt(), "put")
+            }
         }
     }
 
     private fun getData(key: String): NSData? {
         val query = baseQuery(key).apply {
-            setValue(kCFBooleanTrue, forKey = kSecReturnData as String)
+            setValue(true, forKey = kSecReturnData as String)
             setValue(kSecMatchLimitOne, forKey = kSecMatchLimit as String)
         }
-        memScoped {
-            val result = alloc<ObjCObjectVar<*>>()
-            val status = SecItemCopyMatching(query, result.ptr)
-            return when (status) {
-                errSecSuccess -> result.value as? NSData
-                errSecItemNotFound -> null
-                else -> throw mapOSStatus(status.toInt(), "get")
+        return query.useCF { cfQuery ->
+            memScoped {
+                val result = alloc<CFTypeRefVar>()
+                val status = SecItemCopyMatching(cfQuery, result.ptr)
+                when (status) {
+                    errSecSuccess -> CFBridgingRelease(result.value) as? NSData
+                    errSecItemNotFound -> null
+                    else -> throw mapOSStatus(status.toInt(), "get")
+                }
             }
         }
     }
@@ -173,8 +184,20 @@ class IosSecretStore(
         if (length == 0) return ByteArray(0)
         return ByteArray(length).apply {
             usePinned { pinned ->
-                this@toByteArray.getBytes(pinned.addressOf(0), length.toULong())
+                platform.posix.memcpy(pinned.addressOf(0), this@toByteArray.bytes, length.toULong())
             }
+        }
+    }
+
+    // Toll-free bridge: NSMutableDictionary → CFDictionaryRef.
+    // CFBridgingRetain adds +1 retain count; the caller MUST CFRelease.
+    private inline fun <T> NSDictionary.useCF(block: (CFDictionaryRef) -> T): T {
+        val cfRef: CFDictionaryRef = CFBridgingRetain(this)?.reinterpret()
+            ?: error("CFBridgingRetain returned null")
+        return try {
+            block(cfRef)
+        } finally {
+            CFRelease(cfRef)
         }
     }
 
@@ -183,8 +206,15 @@ class IosSecretStore(
 
     // -- Error mapping --
 
-    private fun mapOSStatus(status: Int, operation: String): SecurityError.SecureStorageFailure =
-        SecurityError.SecureStorageFailure(
+    private fun storageException(description: String): SecureStorageException =
+        SecureStorageException(
+            SecurityError.SecureStorageFailure(
+                diagnostic = Diagnostic(description = description)
+            )
+        )
+
+    private fun mapOSStatus(status: Int, operation: String): SecureStorageException =
+        SecureStorageException(SecurityError.SecureStorageFailure(
             diagnostic = Diagnostic(
                 description = "Keychain $operation failed with OSStatus $status",
                 metadata = mapOf(
@@ -193,5 +223,5 @@ class IosSecretStore(
                     "osStatus" to status.toString()
                 )
             )
-        )
+        ))
 }

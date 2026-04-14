@@ -321,6 +321,35 @@ try await sessionController.invalidate()  // limpia credenciales, emite Invalida
 
 ---
 
+### Certificate Pinning
+
+Protege contra ataques MITM fijando los certificados esperados del servidor:
+
+```swift
+import CoreDataPlatform
+
+// 1. Define los pins (SHA-256 del certificado DER, codificado en base64)
+let trustPolicy = DefaultTrustPolicy(
+    pins: [
+        "api.tuempresa.com": Set([
+            CertificatePin(algorithm: "sha256", hash: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="),
+            CertificatePin(algorithm: "sha256", hash: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=")  // backup
+        ])
+    ]
+)
+
+// 2. Crea el engine con pinning habilitado
+let engine = KtorHttpEngine.companion.create(config: myConfig, trustPolicy: trustPolicy)
+
+// 3. La conexión se rechaza si ningún certificado del servidor coincide con los pins.
+```
+
+> **Importante:** Siempre incluye al menos un pin de respaldo. Si el certificado principal rota y no tienes backup, la app no podrá conectarse.
+>
+> En iOS, el pinning usa `handleChallenge` de NSURLSession con evaluación de `SecTrust` internamente.
+
+---
+
 ## ¿Necesitas configuración personalizada?
 
 ```swift

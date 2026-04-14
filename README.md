@@ -264,9 +264,15 @@ core-data-platform/
 │           └── ResponseMetadata.kt           # Código de estado, headers, duración, número de intentos
 │
 ├── network-ktor/                             # Adaptador de transporte Ktor
-│   └── src/commonMain/kotlin/com/dancr/platform/network/ktor/
-│       ├── KtorHttpEngine.kt                 # Implementación de HttpEngine sobre Ktor HttpClient
-│       └── KtorErrorClassifier.kt            # Clasificación de errores consciente de Ktor
+│   └── src/
+│       ├── commonMain/kotlin/com/dancr/platform/network/ktor/
+│       │   ├── KtorHttpEngine.kt             # Implementación de HttpEngine sobre Ktor HttpClient
+│       │   ├── KtorErrorClassifier.kt        # Clasificación de errores consciente de Ktor
+│       │   └── PlatformHttpClient.kt         # expect fun — crea HttpClient con TLS por plataforma
+│       ├── androidMain/kotlin/com/dancr/platform/network/ktor/
+│       │   └── PlatformHttpClient.android.kt # actual — OkHttp + CertificatePinner
+│       └── iosMain/kotlin/com/dancr/platform/network/ktor/
+│           └── PlatformHttpClient.ios.kt     # actual — Darwin + handleChallenge + SecTrust
 │
 ├── security-core/                            # Abstracciones de seguridad
 │   └── src/
@@ -990,7 +996,7 @@ result.fold(
 
 | Tarea | Módulo | Estado |
 |---|---|---|
-| Certificate pinning vía `TrustPolicy` → OkHttp / Darwin TLS | `network-ktor` | 🔴 No iniciado |
+| Certificate pinning vía `TrustPolicy` → OkHttp / Darwin TLS | `network-ktor` | ✅ Completado |
 | Interceptor de auth refresh (401 → refresh → retry) | Módulo puente | 🟡 Habilitado por `CredentialProvider.invalidate()` |
 | Logging de respuestas sanitizado con `LogSanitizer` | `network-core` (vía `headerSanitizer` lambda) | ✅ Completado |
 
@@ -1008,6 +1014,28 @@ result.fold(
 
 ---
 
+## Seguridad — OWASP MASVS
+
+El SDK implementa guardrails de seguridad alineados al [OWASP Mobile Application Security Verification Standard (MASVS)](https://mas.owasp.org/MASVS/).
+Consulta [`docs/security-checklist.md`](docs/security-checklist.md) para el checklist completo.
+
+| Categoría MASVS | Guardrail | Módulo |
+|---|---|---|
+| **NETWORK-1** — Solo HTTPS | `NetworkConfig` rechaza `http://` por defecto | `network-core` |
+| **NETWORK-2** — Certificate Pinning | `TrustPolicy` → OkHttp / Darwin TLS | `network-ktor` |
+| **STORAGE-1** — Almacenamiento seguro | `SecretStore` → EncryptedSharedPrefs / Keychain | `security-core` |
+| **STORAGE-2** — No secretos en logs | `toString()` redactado en `Credential`, `HttpRequest`, `RawResponse`, `SessionCredentials` | `security-core`, `network-core` |
+| **PRIVACY-1** — Header sanitization | `LoggingObserver` redacta ALL headers por defecto | `network-core` |
+| **PRIVACY-2** — Query params en observabilidad | `MetricsObserver` / `TracingObserver` strip query params | `network-core` |
+| **AUTH-1** — Credential lifecycle | `SessionController` con invalidación, refresh, limpieza en logout | `security-core` |
+
+### Principio de diseño
+
+> **El camino seguro es el camino por defecto.**
+> Los guardrails están activos sin configuración. Desactivarlos requiere acción explícita (`allowInsecureConnections`, sanitizer custom).
+
+---
+
 ## Reglas de Diseño
 
 Estas son las invariantes arquitectónicas del proyecto. Todas las contribuciones deben respetarlas.
@@ -1017,6 +1045,7 @@ Estas son las invariantes arquitectónicas del proyecto. Todas las contribucione
 
 2. **`network-core` y `security-core` nunca deben depender el uno del otro.**
    Solo se integran a nivel del consumidor vía composición.
+   Excepción: `network-ktor` depende de `security-core` para configurar certificate pinning via `TrustPolicy`.
 
 3. **Los errores son valores, no excepciones.**
    `NetworkResult.Failure` envuelve `NetworkError`. Las excepciones se capturan en el límite del executor y se clasifican en tipos semánticos.

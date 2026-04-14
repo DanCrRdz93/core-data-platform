@@ -9,9 +9,18 @@ data class NetworkConfig(
     val connectTimeout: Duration = 30.seconds,
     val readTimeout: Duration = 30.seconds,
     val writeTimeout: Duration = 30.seconds,
-    val retryPolicy: RetryPolicy = RetryPolicy.None
+    val retryPolicy: RetryPolicy = RetryPolicy.None,
+    // OWASP MASVS-NETWORK-1: Enforce HTTPS by default.
+    // Set to true ONLY for local development (localhost, emulator).
+    val allowInsecureConnections: Boolean = false
 ) {
     init {
         require(baseUrl.isNotBlank()) { "baseUrl must not be blank" }
+        if (!allowInsecureConnections) {
+            require(baseUrl.startsWith("https://")) {
+                "baseUrl must use HTTPS for secure communication. " +
+                    "Set allowInsecureConnections = true only for local development."
+            }
+        }
     }
 }

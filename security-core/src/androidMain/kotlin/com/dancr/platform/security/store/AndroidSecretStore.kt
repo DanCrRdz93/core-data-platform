@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.dancr.platform.security.error.Diagnostic
+import com.dancr.platform.security.error.SecureStorageException
 import com.dancr.platform.security.error.SecurityError
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -122,14 +123,16 @@ class AndroidSecretStore(
 
     // -- Error mapping --
 
-    private fun mapException(e: Exception): SecurityError.SecureStorageFailure =
-        SecurityError.SecureStorageFailure(
-            diagnostic = Diagnostic(
-                description = e.message ?: "Android secure storage operation failed",
-                cause = e,
-                metadata = mapOf(
-                    "store" to "android_keystore",
-                    "prefsName" to config.preferencesName
+    private fun mapException(e: Exception): SecureStorageException =
+        SecureStorageException(
+            SecurityError.SecureStorageFailure(
+                diagnostic = Diagnostic(
+                    description = e.message ?: "Android secure storage operation failed",
+                    cause = e,
+                    metadata = mapOf(
+                        "store" to "android_keystore",
+                        "prefsName" to config.preferencesName
+                    )
                 )
             )
         )

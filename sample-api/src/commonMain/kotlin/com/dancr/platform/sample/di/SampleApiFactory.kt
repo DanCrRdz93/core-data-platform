@@ -9,6 +9,7 @@ import com.dancr.platform.network.ktor.KtorHttpEngine
 import com.dancr.platform.network.observability.NetworkEventObserver
 import com.dancr.platform.security.credential.CredentialHeaderMapper
 import com.dancr.platform.security.credential.CredentialProvider
+import com.dancr.platform.security.trust.TrustPolicy
 import com.dancr.platform.sample.datasource.UserRemoteDataSource
 import com.dancr.platform.sample.repository.UserRepository
 import kotlin.time.Duration.Companion.seconds
@@ -26,9 +27,10 @@ object SampleApiFactory {
     fun create(
         config: NetworkConfig = defaultConfig,
         credentialProvider: CredentialProvider? = null,
+        trustPolicy: TrustPolicy? = null,
         observers: List<NetworkEventObserver> = emptyList()
     ): UserRepository {
-        val engine = KtorHttpEngine.create(config)
+        val engine = KtorHttpEngine.create(config, trustPolicy)
 
         val interceptors = buildList {
             if (credentialProvider != null) {

@@ -17,6 +17,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(project(":network-core"))
+            implementation(project(":security-core"))
             implementation(libs.ktor.client.core)
         }
 
