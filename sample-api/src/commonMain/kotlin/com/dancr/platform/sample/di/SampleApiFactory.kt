@@ -6,6 +6,7 @@ import com.dancr.platform.network.execution.DefaultSafeRequestExecutor
 import com.dancr.platform.network.execution.RequestInterceptor
 import com.dancr.platform.network.ktor.KtorErrorClassifier
 import com.dancr.platform.network.ktor.KtorHttpEngine
+import com.dancr.platform.network.observability.NetworkEventObserver
 import com.dancr.platform.security.credential.CredentialHeaderMapper
 import com.dancr.platform.security.credential.CredentialProvider
 import com.dancr.platform.sample.datasource.UserRemoteDataSource
@@ -24,7 +25,8 @@ object SampleApiFactory {
 
     fun create(
         config: NetworkConfig = defaultConfig,
-        credentialProvider: CredentialProvider? = null
+        credentialProvider: CredentialProvider? = null,
+        observers: List<NetworkEventObserver> = emptyList()
     ): UserRepository {
         val engine = KtorHttpEngine.create(config)
 
@@ -38,7 +40,8 @@ object SampleApiFactory {
             engine = engine,
             config = config,
             classifier = KtorErrorClassifier(),
-            interceptors = interceptors
+            interceptors = interceptors,
+            observers = observers
         )
 
         val dataSource = UserRemoteDataSource(executor)

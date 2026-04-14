@@ -9,6 +9,7 @@ Una librería Kotlin Multiplatform (KMP) reutilizable y modular diseñada para p
 ## Tabla de Contenidos
 
 - [Documentación](#documentación)
+- [Quick Start](#quick-start)
 - [Resumen](#resumen)
 - [Objetivos del Proyecto](#objetivos-del-proyecto)
 - [Arquitectura](#arquitectura)
@@ -22,6 +23,7 @@ Una librería Kotlin Multiplatform (KMP) reutilizable y modular diseñada para p
 - [Seguridad](#seguridad)
 - [Extensibilidad](#extensibilidad)
 - [Buenas Prácticas](#buenas-prácticas)
+- [Decisiones de Diseño](#decisiones-de-diseño)
 - [Diagramas](#diagramas)
 - [Ejemplo de Integración](#ejemplo-de-integración)
 - [Roadmap](#roadmap)
@@ -34,7 +36,8 @@ Una librería Kotlin Multiplatform (KMP) reutilizable y modular diseñada para p
 ### Guías
 
 - [Guía de Integración](docs/integration-guide.md) — Cómo agregar el SDK como dependencia y conectar módulos de dominio
-- [Guía Rápida para Android](docs/android-quickstart.md) — Primeros pasos para desarrolladores Android sin contexto previo
+- [Guía Rápida para Android](docs/android-quickstart.md) — Primeros pasos para desarrolladores Android con Clean Architecture
+- [Guía Rápida para iOS](docs/ios-quickstart.md) — Primeros pasos para desarrolladores iOS con Clean Architecture
 - [Integración con Clean Architecture](docs/clean-architecture-integration.md) — Cómo usar el SDK en la capa `data` de un proyecto con Clean Architecture
 
 ### READMEs de Módulos
@@ -62,6 +65,32 @@ Una librería Kotlin Multiplatform (KMP) reutilizable y modular diseñada para p
 - [03 — Flujo de Ejecución de Requests](docs/diagrams/03-request-execution-flow.md)
 - [04 — Estrategia KMP](docs/diagrams/04-kmp-strategy.md)
 - [05 — Relaciones entre Contratos](docs/diagrams/05-contract-relationships.md)
+
+---
+
+## Quick Start
+
+```kotlin
+// 1. Crea el repository (configuración por defecto incluida)
+val repository = SampleApiFactory.create()
+
+// 2. Llama un endpoint
+val result: NetworkResult<List<User>> = repository.getUsers()
+
+// 3. Maneja el resultado
+result.fold(
+    onSuccess = { users ->
+        users.forEach { println("${it.displayName} (@${it.handle})") }
+    },
+    onFailure = { error ->
+        println("Error: ${error.message}")
+    }
+)
+```
+
+> `SampleApiFactory.create()` ensambla internamente todo el pipeline: configuración → engine HTTP → executor con reintentos → data source → repository. Tú solo interactúas con `UserRepository` y `NetworkResult<User>`.
+
+Para configuración avanzada (auth, timeouts personalizados, interceptors), consulta la [Guía de Uso](#guía-de-uso) o la [Guía de Integración](docs/integration-guide.md).
 
 ---
 
@@ -156,76 +185,20 @@ Los módulos del SDK se sitúan en la parte inferior del grafo de dependencias. 
 
 ## Estructura de Módulos
 
-### `:network-core`
+| Módulo | Responsabilidad | Contratos clave | Dependencias |
+|---|---|---|---|
+| **`:network-core`** | Abstracciones puras de red: ejecución HTTP, errores, validación, reintentos, observabilidad | `HttpEngine`, `SafeRequestExecutor`, `NetworkResult<T>`, `NetworkError`, `NetworkEventObserver`, `LoggingObserver`, `NetworkLogger`, `RetryPolicy` | Solo `kotlinx-coroutines-core` |
+| **`:network-ktor`** | Adaptador de transporte HTTP. Encapsula Ktor completamente | `KtorHttpEngine`, `KtorErrorClassifier` | `:network-core`, `ktor-client-core`, `ktor-client-okhttp` (Android), `ktor-client-darwin` (iOS) |
+| **`:security-core`** | Credenciales, sesiones, almacenamiento seguro, confianza TLS, sanitización de logs | `Credential`, `CredentialProvider`, `SessionController`, `SecretStore`, `TrustPolicy`, `LogSanitizer` | Solo `kotlinx-coroutines-core` |
+| **`:sample-api`** | Módulo piloto de referencia: demuestra el patrón DTO → Mapper → DataSource → Repository → Factory | `UserDto`, `User`, `UserMapper`, `UserRemoteDataSource`, `UserRepository`, `SampleApiFactory` | `:network-core`, `:network-ktor`, `:security-core`, `kotlinx-serialization-json` |
 
-**Responsabilidad:** Abstracciones puras para ejecución HTTP, modelado de errores, validación, reintentos y observabilidad.
+**Implementaciones de plataforma en `:security-core`:**
+- `AndroidSecretStore` — EncryptedSharedPreferences + Android Keystore (AES-256-GCM)
+- `IosSecretStore` — Keychain Services (`kSecClassGenericPassword`)
+- `DefaultSessionController` — Gestión de sesión con `StateFlow`, persistencia en `SecretStore`, refresh configurable
+- `DefaultCredentialProvider` — Lee credencial activa desde `SessionController.state`
 
-| Expone | NO expone |
-|---|---|
-| `HttpEngine`, `HttpRequest`, `RawResponse`, `HttpMethod` | Ninguna librería de cliente HTTP |
-| `SafeRequestExecutor`, `RequestInterceptor`, `ResponseInterceptor` | Tipos de Ktor, OkHttp, URLSession |
-| `NetworkResult<T>`, `NetworkError`, `Diagnostic` | `Throwable` crudo en API público |
-| `NetworkEventObserver` (contrato de observabilidad) | Implementaciones de logging |
-| `ErrorClassifier`, `ResponseValidator`, `RetryPolicy` | Decisiones de reintento hardcodeadas |
-| `RemoteDataSource` (clase base abstracta) | Estrategia de deserialización |
-| `NetworkConfig`, `RequestContext`, `ResponseMetadata` | Configuración específica de backend |
-
-**Dependencias:** Solo `kotlinx-coroutines-core`.
-
----
-
-### `:network-ktor`
-
-**Responsabilidad:** Implementación de `HttpEngine` basada en Ktor. Encapsula todo el código específico de Ktor.
-
-| Expone | NO expone |
-|---|---|
-| `KtorHttpEngine` (implementa `HttpEngine`) | Configuración interna de `HttpClient` de Ktor |
-| `KtorErrorClassifier` (extiende `DefaultErrorClassifier`) | Tipos de excepción de Ktor a consumidores |
-| Método factory `KtorHttpEngine.create(config)` | Lógica de selección de engine de plataforma |
-
-**Dependencias:** `:network-core`, `ktor-client-core`, `ktor-client-okhttp` (Android), `ktor-client-darwin` (iOS).
-
-**Decisión de diseño clave:** `expectSuccess = false` — Ktor no lanza excepciones en HTTP 4xx/5xx. Todo el manejo de errores fluye a través de `ResponseValidator` y `ErrorClassifier`.
-
----
-
-### `:security-core`
-
-**Responsabilidad:** Abstracciones de seguridad — credenciales, sesiones, almacenamiento seguro, confianza y sanitización de logs.
-
-| Expone | NO expone |
-|---|---|
-| `Credential` (Bearer, ApiKey, Basic, Custom) | Internos del keystore de plataforma |
-| `CredentialProvider`, `CredentialHeaderMapper` | Android Context, iOS Keychain API |
-| `SessionController`, `SessionState`, `SessionEvent` | Implementación de refresh de tokens |
-| Interfaz `SecretStore` | EncryptedSharedPreferences, kSecAttrAccessible |
-| `TrustPolicy`, `CertificatePin`, `TrustEvaluation` | Implementación TLS de plataforma |
-| `LogSanitizer`, `SecurityConfig` | Internos del algoritmo de redacción |
-| `SecurityError`, `Diagnostic` | Excepciones crudas de plataforma |
-
-**Dependencias:** Solo `kotlinx-coroutines-core`.
-
-**Implementaciones de plataforma (estado skeleton):**
-- `AndroidSecretStore` — Preparado para EncryptedSharedPreferences + Android Keystore. Contiene cuerpos TODO con guía de implementación paso a paso.
-- `IosSecretStore` — Preparado para iOS Keychain Services. Contiene cuerpos TODO con patrones de queries de Keychain.
-
----
-
-### `:sample-api`
-
-**Responsabilidad:** Módulo piloto de referencia que demuestra el patrón de uso correcto para módulos de dominio API.
-
-| Capa | Clase | Responsabilidad |
-|---|---|---|
-| DTO | `UserDto`, `CompanyDto` | Modelos `@Serializable` que coinciden exactamente con el JSON del API |
-| Modelo | `User` | Modelo de dominio limpio — sin anotaciones de serialización |
-| Mapper | `UserMapper` | Conversión DTO → Dominio, pura y sin estado |
-| DataSource | `UserRemoteDataSource` | Extiende `RemoteDataSource`, construye `HttpRequest`, deserializa |
-| Repository | `UserRepository` | Mapea `NetworkResult<UserDto>` → `NetworkResult<User>` |
-| Cableado | `SampleApiFactory` | Ensamblaje completo: engine → executor → data source → repository |
-
-**Dependencias:** `:network-core`, `:network-ktor`, `:security-core`, `kotlinx-serialization-json`.
+> Para el detalle completo de cada módulo (tablas Expone/NO expone, contratos internos, decisiones de diseño), consulta los [READMEs de Módulos](#readmes-de-módulos).
 
 ---
 
@@ -277,7 +250,9 @@ core-data-platform/
 │       │   ├── DefaultResponseValidator.kt   # Por defecto: 2xx = válido
 │       │   └── RequestContext.kt             # Metadata por request (operationId, tags, tracing)
 │       ├── observability/
-│       │   └── NetworkEventObserver.kt       # Callbacks de ciclo de vida para métricas/tracing/logging
+│       │   ├── NetworkEventObserver.kt       # Callbacks de ciclo de vida para métricas/tracing/logging
+│       │   ├── NetworkLogger.kt              # fun interface — abstracción de logging (no-op por defecto)
+│       │   └── LoggingObserver.kt            # Observer que registra requests/responses vía NetworkLogger
 │       └── result/
 │           ├── NetworkResult.kt              # Success<T> | Failure — con map, fold, flatMap
 │           ├── NetworkError.kt               # Taxonomía de errores semánticos (sealed class)
@@ -477,57 +452,43 @@ Tu ViewModel nunca importa Ktor. Nunca ve `RawResponse`. Nunca maneja reintentos
 
 ## Flujo de Ejecución de Requests
 
-Lo siguiente describe el ciclo de vida completo de una única request a través del SDK:
+```mermaid
+sequenceDiagram
+    participant C as Consumer
+    participant R as Repository
+    participant DS as DataSource
+    participant E as Executor
+    participant I as Interceptors
+    participant H as HttpEngine
+    participant V as Validator
+    participant CL as Classifier
 
+    C->>R: getUsers()
+    R->>DS: fetchUsers()
+    DS->>E: execute(HttpRequest, deserialize)
+    E->>I: RequestInterceptor chain (auth, tracing)
+    I-->>E: Modified HttpRequest
+    E->>H: execute(request)
+    H-->>E: RawResponse
+    E->>I: ResponseInterceptor chain (logging)
+    I-->>E: RawResponse
+    E->>V: validate(response)
+    alt Valid (2xx)
+        V-->>E: Valid
+        E->>E: deserialize(response) → T
+        E-->>DS: Success(data, metadata)
+    else Invalid (non-2xx)
+        V-->>E: Invalid
+        E->>CL: classify(response)
+        CL-->>E: NetworkError
+        E-->>DS: Failure(error)
+    end
+    DS-->>R: NetworkResult&lt;UserDto&gt;
+    R->>R: .map(UserMapper::toDomain)
+    R-->>C: NetworkResult&lt;User&gt;
 ```
-El consumidor llama: repository.getOrders()
-│
-├─ 1. UserRepository
-│     Llama dataSource.fetchOrders()
-│     Mapea resultado: .map(OrderMapper::toDomain)
-│
-├─ 2. OrderRemoteDataSource : RemoteDataSource
-│     Llama execute(HttpRequest, deserialize)
-│     Delega a SafeRequestExecutor
-│
-├─ 3. DefaultSafeRequestExecutor
-│     │
-│     ├─ 3a. PREPARAR REQUEST
-│     │     • Combinar defaultHeaders de NetworkConfig
-│     │     • Construir URL completa: baseUrl + path
-│     │     • Ejecutar cadena de RequestInterceptor (auth, tracing, headers custom)
-│     │
-│     ├─ 3b. NOTIFICAR OBSERVERS
-│     │     • observer.onRequestStarted(request, context)
-│     │
-│     ├─ 3c. BUCLE DE REINTENTOS (controlado por RetryPolicy)
-│     │     │
-│     │     ├─ TRANSPORTE: HttpEngine.execute(request) → RawResponse
-│     │     │
-│     │     ├─ INTERCEPTORS DE RESPUESTA: ejecutar cadena de ResponseInterceptor
-│     │     │
-│     │     ├─ NOTIFICAR: observer.onResponseReceived(request, response, durationMs)
-│     │     │
-│     │     ├─ VALIDAR: ResponseValidator.validate(response) → Valid | Invalid
-│     │     │     • 2xx + Valid → continuar a deserialización
-│     │     │     • 2xx + Invalid → error ResponseValidation
-│     │     │     • no-2xx → ErrorClassifier.classify(response) → error semántico
-│     │     │
-│     │     ├─ DESERIALIZAR: deserialize(response) → T
-│     │     │
-│     │     └─ En caso de fallo:
-│     │           • Si error.isRetryable Y quedan intentos → delay → reintentar
-│     │           • observer.onRetryScheduled(attempt, maxAttempts, error, delayMs)
-│     │           • En caso contrario → retornar Failure
-│     │
-│     └─ 3d. RETORNAR NetworkResult<T>
-│           • Success(data, ResponseMetadata) — incluye statusCode, durationMs, attemptCount
-│           • Failure(NetworkError) — semántico, con Diagnostic para debugging interno
-│
-└─ 4. El consumidor recibe NetworkResult<Order>
-      • .fold(), .map(), .onSuccess(), .onFailure()
-      • Nunca ve RawResponse, HttpEngine, ni tipos de Ktor
-```
+
+**Resumen del pipeline:** El executor prepara la request (headers por defecto + interceptors), la envía vía `HttpEngine`, ejecuta interceptors de respuesta, valida el status code y deserializa. Si falla con un error retryable (`Connectivity`, `Timeout`, `ServerError`), reintenta según la `RetryPolicy` configurada. El resultado final es siempre un `NetworkResult<T>` — el consumidor nunca ve `RawResponse`, `HttpEngine`, ni tipos de Ktor.
 
 ---
 
@@ -628,7 +589,7 @@ interface SessionController {
 }
 ```
 
-> **Estado:** Interfaz definida. Implementación pendiente — requiere que las implementaciones de `SecretStore` se completen primero.
+> **Estado:** Interfaz definida. Implementación disponible: `DefaultSessionController` — gestiona estado con `StateFlow`, persiste tokens en `SecretStore`, soporta refresh configurable vía lambda.
 
 ### 3. Almacenamiento Seguro
 
@@ -648,8 +609,8 @@ interface SecretStore {
 
 | Plataforma | Implementación | Backend | Estado |
 |---|---|---|---|
-| Android | `AndroidSecretStore` | EncryptedSharedPreferences + Android Keystore | Skeleton con TODOs |
-| iOS | `IosSecretStore` | Keychain Services (`kSecClassGenericPassword`) | Skeleton con TODOs |
+| Android | `AndroidSecretStore` | EncryptedSharedPreferences + Android Keystore (AES-256-GCM) | ✅ Implementado |
+| iOS | `IosSecretStore` | Keychain Services (`kSecClassGenericPassword`) | ✅ Implementado |
 
 ### 4. Política de Confianza
 
@@ -716,7 +677,34 @@ class OkHttpErrorClassifier : DefaultErrorClassifier() {
 }
 ```
 
-### Agregar observabilidad
+### Agregar logging
+
+El SDK incluye `LoggingObserver` + `NetworkLogger` listos para usar. **Por defecto no imprime nada** — el backend de logging lo define el consumidor:
+
+```kotlin
+import com.dancr.platform.network.observability.LoggingObserver
+import com.dancr.platform.network.observability.NetworkLogger
+
+// Conecta tu backend de logging (Timber, Logcat, os_log, etc.)
+val logger = NetworkLogger { level, tag, message ->
+    when (level) {
+        NetworkLogger.Level.DEBUG -> Log.d(tag, message)
+        NetworkLogger.Level.INFO  -> Log.i(tag, message)
+        NetworkLogger.Level.WARN  -> Log.w(tag, message)
+        NetworkLogger.Level.ERROR -> Log.e(tag, message)
+    }
+}
+
+val loggingObserver = LoggingObserver(
+    logger = logger,
+    // Conecta DefaultLogSanitizer para redactar headers sensibles
+    headerSanitizer = { key, value -> logSanitizer.sanitize(key, value) }
+)
+```
+
+> **Importante:** Siempre sanitiza headers en producción. Los observers son solo para observabilidad — nunca para lógica de negocio.
+
+### Agregar observabilidad personalizada
 
 Implementa `NetworkEventObserver` — solo sobreescribe los callbacks que necesites:
 
@@ -731,13 +719,13 @@ class MetricsObserver(private val metrics: MetricsClient) : NetworkEventObserver
 }
 ```
 
-Cabéalo:
+Combina múltiples observers:
 
 ```kotlin
 DefaultSafeRequestExecutor(
     engine = engine,
     config = config,
-    observers = listOf(MetricsObserver(myMetricsClient), TracingObserver(myTracer))
+    observers = listOf(loggingObserver, MetricsObserver(myMetricsClient))
 )
 ```
 
@@ -791,6 +779,18 @@ val loggingInterceptor = ResponseInterceptor { response, request, context ->
 
 ---
 
+## Decisiones de Diseño
+
+| Decisión | Razón |
+|---|---|
+| **`expectSuccess = false` en Ktor** | Por defecto, Ktor lanza excepciones en HTTP 4xx/5xx. Desactivamos esto para que **todas** las respuestas (incluidos errores HTTP) fluyan como valores a través de `ResponseValidator` → `ErrorClassifier` → `NetworkError`. Esto garantiza un modelo de errores unificado sin try-catch dispersos. |
+| **`ByteArray` como tipo de body en `HttpRequest` y `RawResponse`** | Es el tipo más primitivo y agnóstico de serialización. El SDK no asume JSON, Protobuf ni ningún formato específico. Cada módulo de dominio decide cómo serializar/deserializar en su lambda `deserialize`. Esto mantiene `:network-core` libre de dependencias de serialización. |
+| **Separación `:network-core` / `:security-core`** | Abordan preocupaciones ortogonales: transporte HTTP vs. gestión de secretos. Un módulo que solo necesita almacenamiento seguro no arrastra dependencias de red (y viceversa). Se integran únicamente en el punto de consumo vía `CredentialHeaderMapper`, que retorna un `Map<String, String>` — sin tipos de red. Ver [ADR-001](docs/adr/ADR-001-separation-network-core-security-core.md). |
+| **Errores como valores (`NetworkResult`), no excepciones** | `NetworkResult.Failure` envuelve `NetworkError` con semántica clara (`isRetryable`, `message` público, `diagnostic` interno). El consumidor usa `.fold()` para manejo exhaustivo en vez de try-catch. Ver [ADR-006](docs/adr/ADR-006-centralized-error-classification.md). |
+| **Pipeline centralizado en `DefaultSafeRequestExecutor`** | Toda request pasa por el mismo flujo: interceptar → transportar → validar → clasificar → reintentar → deserializar. Esto evita que cada data source reimplemente lógica de reintentos o manejo de errores. Ver [ADR-005](docs/adr/ADR-005-centralized-safe-execution-pipeline.md). |
+
+---
+
 ## Diagramas
 
 ### Grafo de Dependencias de Módulos
@@ -816,44 +816,6 @@ graph TD
     style NK fill:#e8f5e9,stroke:#2e7d32
     style SA fill:#fff3e0,stroke:#ef6c00
     style APP fill:#f3e5f5,stroke:#7b1fa2
-```
-
-### Pipeline de Ejecución
-
-```mermaid
-sequenceDiagram
-    participant C as Consumer
-    participant R as Repository
-    participant DS as DataSource
-    participant E as Executor
-    participant I as Interceptors
-    participant H as HttpEngine
-    participant V as Validator
-    participant CL as Classifier
-
-    C->>R: getOrders()
-    R->>DS: fetchOrders()
-    DS->>E: execute(HttpRequest, deserialize)
-    E->>I: RequestInterceptor chain (auth, tracing)
-    I-->>E: Modified HttpRequest
-    E->>H: execute(request)
-    H-->>E: RawResponse
-    E->>I: ResponseInterceptor chain (logging)
-    I-->>E: RawResponse
-    E->>V: validate(response)
-    alt Valid (2xx)
-        V-->>E: Valid
-        E->>E: deserialize(response) → T
-        E-->>DS: Success(data, metadata)
-    else Invalid (non-2xx)
-        V-->>E: Invalid
-        E->>CL: classify(response)
-        CL-->>E: NetworkError
-        E-->>DS: Failure(error)
-    end
-    DS-->>R: NetworkResult<Dto>
-    R->>R: .map(Mapper::toDomain)
-    R-->>C: NetworkResult<Model>
 ```
 
 ### Distribución de Source Sets KMP
@@ -982,16 +944,16 @@ result.fold(
 
 | Tarea | Módulo | Estado |
 |---|---|---|
-| Implementar `AndroidSecretStore` con EncryptedSharedPreferences | `security-core` | 🟡 Skeleton listo |
-| Implementar `IosSecretStore` con Keychain Services | `security-core` | 🟡 Skeleton listo |
-| Implementar `DefaultSessionController` con StateFlow + almacenamiento de tokens | `security-core` | 🔴 No iniciado |
-| Implementar `CredentialProvider` respaldado por SessionController | `security-core` | 🔴 No iniciado |
+| Implementar `AndroidSecretStore` con EncryptedSharedPreferences | `security-core` | ✅ Completado |
+| Implementar `IosSecretStore` con Keychain Services | `security-core` | ✅ Completado |
+| Implementar `DefaultSessionController` con StateFlow + almacenamiento de tokens | `security-core` | ✅ Completado |
+| Implementar `DefaultCredentialProvider` respaldado por SessionController | `security-core` | ✅ Completado |
 
 ### Fase 2 — Observabilidad y Testing
 
 | Tarea | Módulo | Estado |
 |---|---|---|
-| `LoggingObserver` — logging estructurado del ciclo de vida de requests | `network-core` | 🔴 No iniciado |
+| `LoggingObserver` + `NetworkLogger` — logging del ciclo de vida de requests con sanitización | `network-core` | ✅ Completado |
 | `MetricsObserver` — latencia, tasa de errores, conteo de reintentos | `network-core` | 🔴 No iniciado |
 | Tests de integración con Ktor `MockEngine` | `network-ktor` | 🔴 No iniciado |
 | Tests unitarios para `DefaultSafeRequestExecutor` | `network-core` | 🔴 No iniciado |
@@ -1002,7 +964,7 @@ result.fold(
 |---|---|---|
 | Certificate pinning vía `TrustPolicy` → OkHttp / Darwin TLS | `network-ktor` | 🔴 No iniciado |
 | Interceptor de auth refresh (401 → refresh → retry) | Módulo puente | 🔴 No iniciado |
-| Logging de respuestas sanitizado con `LogSanitizer` | Módulo puente | 🔴 No iniciado |
+| Logging de respuestas sanitizado con `LogSanitizer` | `network-core` (vía `headerSanitizer` lambda) | ✅ Completado |
 
 ### Fase 4 — Escala
 

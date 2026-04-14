@@ -10,7 +10,6 @@ import com.dancr.platform.network.result.NetworkError
 //
 // TODO: Implement MetricsObserver — collect request count, latency histograms, error rates.
 // TODO: Implement TracingObserver — create spans per request, propagate trace context via headers.
-// TODO: Implement LoggingObserver — structured logging of request lifecycle events.
 interface NetworkEventObserver {
 
     fun onRequestStarted(request: HttpRequest, context: RequestContext?) {}
