@@ -1,17 +1,17 @@
-# KMP Source Set Strategy
+# Estrategia de Source Sets KMP
 
-Distribution of code across Kotlin Multiplatform source sets. The project maximizes `commonMain` and pushes platform-specific code to the absolute edges.
+Distribución de código entre source sets de Kotlin Multiplatform. El proyecto maximiza `commonMain` y empuja el código específico de plataforma a los bordes absolutos.
 
-## Source Set Distribution
+## Distribución de Source Sets
 
 ![KMP Source Set Distribution](images/04-kmp-strategy.svg)
 
 <details>
-<summary>Mermaid source</summary>
+<summary>Código fuente Mermaid</summary>
 
 ```mermaid
 graph TB
-    subgraph commonMain["commonMain — 43 files (95%+)"]
+    subgraph commonMain["commonMain — 43 archivos (95%+)"]
         direction TB
         subgraph nc_common["network-core (20 files)"]
             NC1["HttpEngine, HttpRequest, RawResponse, HttpMethod"]
@@ -45,12 +45,12 @@ graph TB
         end
     end
 
-    subgraph androidMain["androidMain — 2 files"]
+    subgraph androidMain["androidMain — 2 archivos"]
         AND1["AndroidSecretStore<br/><i>EncryptedSharedPreferences<br/>+ Android Keystore</i>"]
         AND2["AndroidStoreConfig"]
     end
 
-    subgraph iosMain["iosMain — 2 files"]
+    subgraph iosMain["iosMain — 2 archivos"]
         IOS1["IosSecretStore<br/><i>Keychain Services</i>"]
         IOS2["KeychainConfig<br/>+ KeychainAccessibility"]
     end
@@ -69,12 +69,12 @@ graph TB
 
 </details>
 
-## Decision Rules
+## Reglas de Decisión
 
 ![Decision Rules](images/04b-decision-rules.svg)
 
 <details>
-<summary>Mermaid source</summary>
+<summary>Código fuente Mermaid</summary>
 
 ```mermaid
 flowchart TD
@@ -97,12 +97,12 @@ flowchart TD
 
 </details>
 
-| Rule | Example |
+| Regla | Ejemplo |
 |---|---|
-| Interfaces and contracts → `commonMain` | `SecretStore`, `HttpEngine`, `TrustPolicy` |
-| Sealed classes and data models → `commonMain` | `NetworkError`, `Credential`, `SessionState` |
-| Default implementations (pure logic) → `commonMain` | `DefaultSafeRequestExecutor`, `DefaultLogSanitizer` |
-| Configuration data classes → `commonMain` | `AndroidStoreConfig`, `KeychainConfig`, `NetworkConfig` |
-| Platform I/O → platform source set | `AndroidSecretStore`, `IosSecretStore` |
-| Platform enums → platform source set | `KeychainAccessibility` (maps to `kSecAttrAccessible*`) |
-| Ktor engine selection → Gradle dependencies | `ktor-client-okhttp` (androidMain.dependencies), `ktor-client-darwin` (iosMain.dependencies) |
+| Interfaces y contratos → `commonMain` | `SecretStore`, `HttpEngine`, `TrustPolicy` |
+| Sealed classes y modelos de datos → `commonMain` | `NetworkError`, `Credential`, `SessionState` |
+| Implementaciones por defecto (lógica pura) → `commonMain` | `DefaultSafeRequestExecutor`, `DefaultLogSanitizer` |
+| Data classes de configuración → `commonMain` | `AndroidStoreConfig`, `KeychainConfig`, `NetworkConfig` |
+| I/O de plataforma → source set de plataforma | `AndroidSecretStore`, `IosSecretStore` |
+| Enums de plataforma → source set de plataforma | `KeychainAccessibility` (mapea a `kSecAttrAccessible*`) |
+| Selección de engine Ktor → dependencias Gradle | `ktor-client-okhttp` (androidMain.dependencies), `ktor-client-darwin` (iosMain.dependencies) |

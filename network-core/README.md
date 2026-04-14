@@ -1,44 +1,44 @@
 # :network-core
 
-**Pure Network Abstractions for Kotlin Multiplatform**
+**Abstracciones Puras de Red para Kotlin Multiplatform**
 
-This module defines the entire contract surface for HTTP execution, error modeling, response validation, retry policies, and observability — without depending on any HTTP client library.
-
----
-
-## Purpose
-
-`:network-core` is the **foundation layer** of the Core Data Platform SDK. It answers one question:
-
-> *"How do I execute, validate, retry, and classify HTTP operations safely — without knowing which HTTP library is used underneath?"*
-
-Every class in this module is either an **interface**, a **sealed class**, a **data class**, or a **default implementation** that can be overridden. There is no Ktor, no OkHttp, no URLSession — only pure Kotlin and `kotlinx-coroutines`.
+Este módulo define toda la superficie de contratos para ejecución HTTP, modelado de errores, validación de respuestas, políticas de reintentos y observabilidad — sin depender de ninguna librería de cliente HTTP.
 
 ---
 
-## Responsibilities
+## Propósito
 
-| Responsibility | Owner |
+`:network-core` es la **capa base** del SDK Core Data Platform. Responde una pregunta:
+
+> *"¿Cómo ejecuto, valido, reintento y clasifico operaciones HTTP de forma segura — sin saber qué librería HTTP se usa por debajo?"*
+
+Cada clase en este módulo es una **interfaz**, una **sealed class**, una **data class**, o una **implementación por defecto** que puede sobreescribirse. No hay Ktor, no hay OkHttp, no hay URLSession — solo Kotlin puro y `kotlinx-coroutines`.
+
+---
+
+## Responsabilidades
+
+| Responsabilidad | Dueño |
 |---|---|
-| Define the transport abstraction | `HttpEngine` |
-| Model HTTP requests and responses | `HttpRequest`, `RawResponse`, `HttpMethod` |
-| Execute requests safely with error boundaries | `SafeRequestExecutor`, `DefaultSafeRequestExecutor` |
-| Intercept requests before transport | `RequestInterceptor` |
-| Intercept responses after transport | `ResponseInterceptor` |
-| Validate responses before deserialization | `ResponseValidator`, `DefaultResponseValidator` |
-| Classify errors into semantic types | `ErrorClassifier`, `DefaultErrorClassifier` |
-| Model errors with user-safe messages + internal diagnostics | `NetworkError`, `Diagnostic` |
-| Wrap results with success/failure semantics | `NetworkResult<T>`, `ResponseMetadata` |
-| Configure retry behavior | `RetryPolicy` (None, FixedDelay, ExponentialBackoff) |
-| Provide observability hooks | `NetworkEventObserver` |
-| Provide a base class for remote data sources | `RemoteDataSource` |
-| Hold network configuration | `NetworkConfig` |
+| Definir la abstracción de transporte | `HttpEngine` |
+| Modelar requests y respuestas HTTP | `HttpRequest`, `RawResponse`, `HttpMethod` |
+| Ejecutar requests de forma segura con límites de error | `SafeRequestExecutor`, `DefaultSafeRequestExecutor` |
+| Interceptar requests antes del transporte | `RequestInterceptor` |
+| Interceptar respuestas después del transporte | `ResponseInterceptor` |
+| Validar respuestas antes de la deserialización | `ResponseValidator`, `DefaultResponseValidator` |
+| Clasificar errores en tipos semánticos | `ErrorClassifier`, `DefaultErrorClassifier` |
+| Modelar errores con mensajes seguros para usuario + diagnósticos internos | `NetworkError`, `Diagnostic` |
+| Envolver resultados con semántica de éxito/fallo | `NetworkResult<T>`, `ResponseMetadata` |
+| Configurar comportamiento de reintentos | `RetryPolicy` (None, FixedDelay, ExponentialBackoff) |
+| Proveer hooks de observabilidad | `NetworkEventObserver` |
+| Proveer clase base para data sources remotos | `RemoteDataSource` |
+| Contener configuración de red | `NetworkConfig` |
 
 ---
 
-## Principal Contracts
+## Contratos Principales
 
-### Transport
+### Transporte
 
 ```kotlin
 interface HttpEngine {
@@ -47,9 +47,9 @@ interface HttpEngine {
 }
 ```
 
-**Contract rule:** `HttpEngine` must **never throw** for HTTP error status codes (4xx, 5xx). It returns them as `RawResponse`. Only transport-level failures (connectivity, timeout, TLS) should throw.
+**Regla del contrato:** `HttpEngine` **nunca debe lanzar excepciones** para códigos de estado HTTP de error (4xx, 5xx). Los retorna como `RawResponse`. Solo las fallas a nivel de transporte (conectividad, timeout, TLS) deben lanzar.
 
-### Request Model
+### Modelo de Request
 
 ```kotlin
 data class HttpRequest(
@@ -61,11 +61,11 @@ data class HttpRequest(
 )
 ```
 
-- `path` is relative (e.g., `/users/1`). The executor prepends `NetworkConfig.baseUrl`.
-- `headers` are single-value. Multi-value headers are not needed for outbound requests in practice.
-- `body` is raw `ByteArray` — the module is serialization-agnostic.
+- `path` es relativo (ej. `/users/1`). El executor antepone `NetworkConfig.baseUrl`.
+- `headers` son de valor único. Los headers multi-valor no se necesitan para requests salientes en la práctica.
+- `body` es `ByteArray` crudo — el módulo es agnóstico de serialización.
 
-### Response Model
+### Modelo de Respuesta
 
 ```kotlin
 data class RawResponse(
@@ -78,10 +78,10 @@ data class RawResponse(
 }
 ```
 
-- `headers` are multi-value (standard HTTP allows multiple values per header name).
-- `body` is nullable (e.g., 204 No Content).
+- `headers` son multi-valor (HTTP estándar permite múltiples valores por nombre de header).
+- `body` es nullable (ej. 204 No Content).
 
-### Execution Pipeline
+### Pipeline de Ejecución
 
 ```kotlin
 interface SafeRequestExecutor {
@@ -93,9 +93,9 @@ interface SafeRequestExecutor {
 }
 ```
 
-This is the **primary entry point** for all network operations. Consumers never call `HttpEngine` directly.
+Este es el **punto de entrada principal** para todas las operaciones de red. Los consumidores nunca llaman a `HttpEngine` directamente.
 
-### Result Model
+### Modelo de Resultado
 
 ```kotlin
 sealed class NetworkResult<out T> {
@@ -113,26 +113,26 @@ sealed class NetworkResult<out T> {
 }
 ```
 
-### Error Taxonomy
+### Taxonomía de Errores
 
 ```kotlin
 sealed class NetworkError {
-    abstract val message: String           // Safe for end users
-    abstract val diagnostic: Diagnostic?   // Internal debugging only
-    open val isRetryable: Boolean = false   // Controls automatic retry
+    abstract val message: String           // Seguro para usuarios finales
+    abstract val diagnostic: Diagnostic?   // Solo debugging interno
+    open val isRetryable: Boolean = false   // Controla reintento automático
 
-    // Transport layer
+    // Capa de transporte
     class Connectivity   // isRetryable = true
     class Timeout        // isRetryable = true
     class Cancelled      // isRetryable = false
 
-    // HTTP semantic layer
+    // Capa semántica HTTP
     class Authentication // 401
     class Authorization  // 403
-    class ClientError    // 4xx (other)
+    class ClientError    // 4xx (otros)
     class ServerError    // 5xx — isRetryable = true
 
-    // Data processing
+    // Procesamiento de datos
     class Serialization
     class ResponseValidation
 
@@ -143,50 +143,50 @@ sealed class NetworkError {
 
 ---
 
-## Internal Structure
+## Estructura Interna
 
 ```
 network-core/src/commonMain/kotlin/com/dancr/platform/network/
 │
-├── client/                         # Transport abstraction
-│   ├── HttpEngine.kt               # Interface — execute + close
+├── client/                         # Abstracción de transporte
+│   ├── HttpEngine.kt               # Interfaz — execute + close
 │   ├── HttpMethod.kt               # Enum: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
 │   ├── HttpRequest.kt              # Data class — path, method, headers, query, body
 │   └── RawResponse.kt              # Data class — statusCode, headers, body
 │
-├── config/                         # Configuration
+├── config/                         # Configuración
 │   ├── NetworkConfig.kt            # baseUrl, timeouts, defaultHeaders, retryPolicy
 │   └── RetryPolicy.kt             # Sealed: None, FixedDelay, ExponentialBackoff
 │
-├── datasource/                     # Base class for remote data sources
-│   └── RemoteDataSource.kt         # Abstract — wraps SafeRequestExecutor.execute()
+├── datasource/                     # Clase base para data sources remotos
+│   └── RemoteDataSource.kt         # Abstracta — envuelve SafeRequestExecutor.execute()
 │
-├── execution/                      # Execution pipeline
-│   ├── SafeRequestExecutor.kt      # Interface — the public entry point
-│   ├── DefaultSafeRequestExecutor.kt  # Full pipeline implementation
-│   ├── RequestInterceptor.kt       # fun interface — pre-transport request modification
-│   ├── ResponseInterceptor.kt      # fun interface — post-transport response processing
-│   ├── ErrorClassifier.kt          # Interface — exception/response → NetworkError
-│   ├── DefaultErrorClassifier.kt   # Heuristic classifier (open class)
-│   ├── ResponseValidator.kt        # Interface + ValidationOutcome sealed class
-│   ├── DefaultResponseValidator.kt # Default: 2xx = Valid
-│   └── RequestContext.kt           # Per-request metadata (operationId, tags, tracing)
+├── execution/                      # Pipeline de ejecución
+│   ├── SafeRequestExecutor.kt      # Interfaz — el punto de entrada público
+│   ├── DefaultSafeRequestExecutor.kt  # Implementación completa del pipeline
+│   ├── RequestInterceptor.kt       # fun interface — modificación de request pre-transporte
+│   ├── ResponseInterceptor.kt      # fun interface — procesamiento de respuesta post-transporte
+│   ├── ErrorClassifier.kt          # Interfaz — excepción/respuesta → NetworkError
+│   ├── DefaultErrorClassifier.kt   # Clasificador heurístico (clase open)
+│   ├── ResponseValidator.kt        # Interfaz + sealed class ValidationOutcome
+│   ├── DefaultResponseValidator.kt # Por defecto: 2xx = Valid
+│   └── RequestContext.kt           # Metadata por request (operationId, tags, tracing)
 │
-├── observability/                  # Observability hooks
-│   └── NetworkEventObserver.kt     # Lifecycle callbacks with default no-op
+├── observability/                  # Hooks de observabilidad
+│   └── NetworkEventObserver.kt     # Callbacks de ciclo de vida con default no-op
 │
-└── result/                         # Result types
+└── result/                         # Tipos de resultado
     ├── NetworkResult.kt            # Sealed: Success<T> | Failure
-    ├── NetworkError.kt             # Semantic error sealed class
-    ├── Diagnostic.kt               # Internal error details (description, cause, metadata)
+    ├── NetworkError.kt             # Sealed class de errores semánticos
+    ├── Diagnostic.kt               # Detalles internos de error (description, cause, metadata)
     └── ResponseMetadata.kt         # statusCode, headers, durationMs, requestId, attemptCount
 ```
 
 ---
 
-## How It Works
+## Cómo Funciona
 
-### DefaultSafeRequestExecutor Pipeline
+### Pipeline de DefaultSafeRequestExecutor
 
 ```mermaid
 flowchart TD
@@ -219,18 +219,18 @@ flowchart TD
     style Q fill:#ffebee
 ```
 
-### Key behaviors
+### Comportamientos clave
 
-1. **CancellationException is always rethrown** — never caught, never classified. Coroutine cancellation is propagated correctly.
-2. **Retry is controlled by the error model** — `error.isRetryable` decides. The executor does not hardcode which errors to retry.
-3. **Observers are notified at every lifecycle point** — start, response, retry, failure. All callbacks are no-op by default.
-4. **Response interceptors run after transport but before validation** — they can modify the response (e.g., cache it) before the pipeline decides if it's valid.
+1. **CancellationException siempre se relanza** — nunca se captura, nunca se clasifica. La cancelación de coroutines se propaga correctamente.
+2. **El reintento es controlado por el modelo de error** — `error.isRetryable` decide. El executor no hardcodea qué errores reintentar.
+3. **Los observers son notificados en cada punto del ciclo de vida** — inicio, respuesta, reintento, fallo. Todos los callbacks son no-op por defecto.
+4. **Los interceptors de respuesta se ejecutan después del transporte pero antes de la validación** — pueden modificar la respuesta (ej. cachearla) antes de que el pipeline decida si es válida.
 
 ---
 
-## Usage Examples
+## Ejemplos de Uso
 
-### Creating an executor
+### Crear un executor
 
 ```kotlin
 val executor = DefaultSafeRequestExecutor(
@@ -249,7 +249,7 @@ val executor = DefaultSafeRequestExecutor(
 )
 ```
 
-### Building a data source
+### Construir un data source
 
 ```kotlin
 class OrderDataSource(executor: SafeRequestExecutor) : RemoteDataSource(executor) {
@@ -265,7 +265,7 @@ class OrderDataSource(executor: SafeRequestExecutor) : RemoteDataSource(executor
 }
 ```
 
-### Consuming results
+### Consumir resultados
 
 ```kotlin
 dataSource.fetchOrders()
@@ -276,7 +276,7 @@ dataSource.fetchOrders()
     )
 ```
 
-### Custom request interceptor
+### Interceptor de request personalizado
 
 ```kotlin
 val tracingInterceptor = RequestInterceptor { request, context ->
@@ -285,7 +285,7 @@ val tracingInterceptor = RequestInterceptor { request, context ->
 }
 ```
 
-### Custom response interceptor
+### Interceptor de respuesta personalizado
 
 ```kotlin
 val loggingInterceptor = ResponseInterceptor { response, request, context ->
@@ -294,7 +294,7 @@ val loggingInterceptor = ResponseInterceptor { response, request, context ->
 }
 ```
 
-### Custom observer
+### Observer personalizado
 
 ```kotlin
 class MetricsObserver(private val client: MetricsClient) : NetworkEventObserver {
@@ -309,69 +309,69 @@ class MetricsObserver(private val client: MetricsClient) : NetworkEventObserver 
 
 ---
 
-## Design Decisions
+## Decisiones de Diseño
 
-| Decision | Rationale |
+| Decisión | Razón |
 |---|---|
-| **`HttpEngine` returns `RawResponse` for all status codes** | Separates transport from validation. The engine's job is to deliver the response; the validator's job is to judge it. |
-| **`NetworkError` is sealed** | Exhaustive `when` matching at compile time. No "unknown" subtypes sneaking in. |
-| **`isRetryable` is an `open val` on `NetworkError`** | Retry policy is a property of the error, not hardcoded in the executor. This makes retry behavior transparent and extensible. |
-| **`DefaultErrorClassifier` uses class name heuristics** | In `commonMain`, platform exception types (e.g., `java.net.SocketTimeoutException`) are not available. Class name matching is a reasonable cross-platform heuristic. Platform modules override with type-safe matching. |
-| **`Diagnostic` is separate from `message`** | `message` is safe for end users ("Unable to reach the server"). `Diagnostic` is for developers (includes `Throwable`, metadata). These audiences must never be mixed. |
-| **Interceptors are `fun interface`** | Allows both class-based and lambda-based implementations. Idiomatic Kotlin. |
-| **Observers have default no-op methods** | Implementors only override what they need. No adapter classes required. |
-| **`ResponseMetadata` includes `attemptCount`** | Consumers can know if their request required retries without inspecting logs. |
-| **`RemoteDataSource` is an abstract class, not an interface** | It provides a protected `execute()` method that wraps `SafeRequestExecutor`. Using a class prevents accidental re-exposure of the executor. |
+| **`HttpEngine` retorna `RawResponse` para todos los códigos de estado** | Separa transporte de validación. El trabajo del engine es entregar la respuesta; el del validator es juzgarla. |
+| **`NetworkError` es sealed** | Matching `when` exhaustivo en tiempo de compilación. Sin subtipos "desconocidos" colándose. |
+| **`isRetryable` es un `open val` en `NetworkError`** | La política de reintentos es propiedad del error, no hardcodeada en el executor. Esto hace el comportamiento de reintento transparente y extensible. |
+| **`DefaultErrorClassifier` usa heurísticas de nombre de clase** | En `commonMain`, los tipos de excepción de plataforma (ej. `java.net.SocketTimeoutException`) no están disponibles. El matching por nombre de clase es una heurística cross-platform razonable. Los módulos de plataforma sobreescriben con matching type-safe. |
+| **`Diagnostic` está separado de `message`** | `message` es seguro para usuarios finales ("Unable to reach the server"). `Diagnostic` es para desarrolladores (incluye `Throwable`, metadata). Estas audiencias nunca deben mezclarse. |
+| **Los interceptors son `fun interface`** | Permite implementaciones basadas en clase y en lambda. Kotlin idiomático. |
+| **Los observers tienen métodos default no-op** | Los implementadores solo sobreescriben lo que necesitan. No se requieren clases adapter. |
+| **`ResponseMetadata` incluye `attemptCount`** | Los consumidores pueden saber si su request requirió reintentos sin inspeccionar logs. |
+| **`RemoteDataSource` es una clase abstracta, no una interfaz** | Provee un método protected `execute()` que envuelve `SafeRequestExecutor`. Usar una clase previene la re-exposición accidental del executor. |
 
 ---
 
-## Extensibility
+## Extensibilidad
 
-| Extension Point | How |
+| Punto de Extensión | Cómo |
 |---|---|
-| **New transport** | Implement `HttpEngine` in a new module (e.g., `:network-okhttp`) |
-| **Platform error classification** | Extend `DefaultErrorClassifier`, override `classifyThrowable()` for type-safe matching |
-| **Custom response validation** | Implement `ResponseValidator` (e.g., reject responses missing a required header) |
-| **Pre-request processing** | Add a `RequestInterceptor` (auth, tracing, custom headers) |
-| **Post-response processing** | Add a `ResponseInterceptor` (logging, caching, header extraction) |
-| **Observability** | Implement `NetworkEventObserver` (metrics, tracing, structured logging) |
-| **Custom retry policies** | Add new `RetryPolicy` subtypes (requires modifying sealed class) |
+| **Nuevo transporte** | Implementar `HttpEngine` en un nuevo módulo (ej. `:network-okhttp`) |
+| **Clasificación de errores de plataforma** | Extender `DefaultErrorClassifier`, sobreescribir `classifyThrowable()` para matching type-safe |
+| **Validación de respuesta personalizada** | Implementar `ResponseValidator` (ej. rechazar respuestas sin un header requerido) |
+| **Procesamiento pre-request** | Agregar un `RequestInterceptor` (auth, tracing, headers custom) |
+| **Procesamiento post-respuesta** | Agregar un `ResponseInterceptor` (logging, caching, extracción de headers) |
+| **Observabilidad** | Implementar `NetworkEventObserver` (métricas, tracing, logging estructurado) |
+| **Políticas de reintento personalizadas** | Agregar nuevos subtipos de `RetryPolicy` (requiere modificar la sealed class) |
 
 ---
 
-## Current Limitations
+## Limitaciones Actuales
 
-| Limitation | Context |
+| Limitación | Contexto |
 |---|---|
-| **No response interceptor can trigger a retry** | The retry loop only reacts to `error.isRetryable`. A response interceptor that detects a 401 cannot trigger a token refresh + retry. This requires a future `AuthRefreshInterceptor` pattern. |
-| **`RetryPolicy` is sealed** | Adding new strategies (e.g., circuit breaker) requires modifying this file. Consider making it an interface in the future if more strategies emerge. |
-| **No built-in caching** | `ResponseInterceptor` is the hook, but no caching implementation exists yet. |
-| **`Diagnostic` is duplicated in `security-core`** | Both modules define identical `Diagnostic` data classes in different packages. A future `:platform-common` module should unify them. |
-| **No streaming support** | `RawResponse.body` is `ByteArray?` — entire body in memory. Large payload streaming requires a future `Flow<ByteArray>` model. |
+| **Ningún interceptor de respuesta puede disparar un reintento** | El bucle de reintentos solo reacciona a `error.isRetryable`. Un interceptor de respuesta que detecta un 401 no puede disparar un refresh de token + reintento. Esto requiere un futuro patrón `AuthRefreshInterceptor`. |
+| **`RetryPolicy` es sealed** | Agregar nuevas estrategias (ej. circuit breaker) requiere modificar este archivo. Considerar convertirlo en interfaz en el futuro si emergen más estrategias. |
+| **Sin caching incorporado** | `ResponseInterceptor` es el hook, pero aún no existe implementación de caching. |
+| **`Diagnostic` está duplicado en `security-core`** | Ambos módulos definen data classes `Diagnostic` idénticas en paquetes diferentes. Un futuro módulo `:platform-common` debería unificarlas. |
+| **Sin soporte de streaming** | `RawResponse.body` es `ByteArray?` — body entero en memoria. El streaming de payloads grandes requiere un futuro modelo `Flow<ByteArray>`. |
 
 ---
 
-## TODOs and Future Work
+## TODOs y Trabajo Futuro
 
-| Item | Location | Description |
+| Ítem | Ubicación | Descripción |
 |---|---|---|
-| `healthCheck()` | `HttpEngine` | Connection pool / liveness probing |
-| `classifyForRetry()` | `ErrorClassifier` | Per-attempt classification for circuit breaker patterns |
-| `MetricsObserver` | `observability/` | Collect request count, latency histograms, error rates |
-| `TracingObserver` | `observability/` | Create spans per request, propagate `parentSpanId` via headers |
-| `LoggingObserver` | `observability/` | Structured logging of the full request lifecycle |
-| `LoggingResponseInterceptor` | `execution/` | Centralized response logging with `LogSanitizer` integration |
-| `CachingResponseInterceptor` | `execution/` | Conditional caching based on `Cache-Control` headers |
-| Circuit breaker `RetryPolicy` | `config/` | Open-circuit after N consecutive failures |
+| `healthCheck()` | `HttpEngine` | Pool de conexiones / prueba de vivacidad |
+| `classifyForRetry()` | `ErrorClassifier` | Clasificación por intento para patrones de circuit breaker |
+| `MetricsObserver` | `observability/` | Recolectar conteo de requests, histogramas de latencia, tasas de error |
+| `TracingObserver` | `observability/` | Crear spans por request, propagar `parentSpanId` vía headers |
+| `LoggingObserver` | `observability/` | Logging estructurado del ciclo de vida completo de requests |
+| `LoggingResponseInterceptor` | `execution/` | Logging centralizado de respuestas con integración de `LogSanitizer` |
+| `CachingResponseInterceptor` | `execution/` | Caching condicional basado en headers `Cache-Control` |
+| Circuit breaker `RetryPolicy` | `config/` | Abrir circuito después de N fallos consecutivos |
 
 ---
 
-## Dependencies
+## Dependencias
 
 ```toml
-# Only dependency — no HTTP client, no serialization
+# Única dependencia — sin cliente HTTP, sin serialización
 [dependencies]
 kotlinx-coroutines-core = "1.10.1"
 ```
 
-This module compiles to **all targets**: Android, iosX64, iosArm64, iosSimulatorArm64.
+Este módulo compila para **todos los targets**: Android, iosX64, iosArm64, iosSimulatorArm64.

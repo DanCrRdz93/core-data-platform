@@ -1,11 +1,11 @@
-# General Architecture
+# Arquitectura General
 
-Overview of how the Core Data Platform SDK fits within a consuming application. The SDK provides the foundation layer (networking + security), domain API modules sit on top, and application features consume clean domain models without knowledge of transport or security internals.
+Vista general de cómo el SDK Core Data Platform encaja dentro de una aplicación consumidora. El SDK provee la capa base (networking + seguridad), los módulos de dominio API se sitúan encima, y las funcionalidades de la aplicación consumen modelos de dominio limpios sin conocimiento de los detalles internos de transporte o seguridad.
 
 ![General Architecture](images/01-general-architecture.svg)
 
 <details>
-<summary>Mermaid source</summary>
+<summary>Código fuente Mermaid</summary>
 
 ```mermaid
 graph TD
@@ -59,9 +59,9 @@ graph TD
 
 </details>
 
-## Key Principles
+## Principios Clave
 
-- **Application features** never import SDK types directly. They receive clean domain models (`User`, `Order`, `Payment`) from repositories.
-- **Domain API modules** are the integration point. They depend on both `:network-core` and `:security-core`, composing them via factories.
-- **`:network-core` and `:security-core` are independent.** Neither imports the other. They are composed only at the domain module level.
-- **`:network-ktor` is replaceable.** It is the only module that imports Ktor. Swapping it requires zero changes to any other module.
+- **Las funcionalidades de la aplicación** nunca importan tipos del SDK directamente. Reciben modelos de dominio limpios (`User`, `Order`, `Payment`) de los repositories.
+- **Los módulos de dominio API** son el punto de integración. Dependen tanto de `:network-core` como de `:security-core`, componiéndolos vía factories.
+- **`:network-core` y `:security-core` son independientes.** Ninguno importa al otro. Solo se componen a nivel de módulo de dominio.
+- **`:network-ktor` es reemplazable.** Es el único módulo que importa Ktor. Intercambiarlo requiere cero cambios en cualquier otro módulo.

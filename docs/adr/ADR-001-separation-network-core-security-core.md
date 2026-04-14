@@ -1,29 +1,29 @@
-# ADR-001: Separation Between network-core and security-core
+# ADR-001: Separación entre network-core y security-core
 
-## Status
+## Estado
 
-**Accepted**
+**Aceptado**
 
-## Context
+## Contexto
 
-The Core Data Platform SDK needs to provide both HTTP networking capabilities and security features (credential management, secure storage, session lifecycle, TLS trust, log sanitization). The initial design question was whether these should live in a single module or be separated.
+El SDK Core Data Platform necesita proveer tanto capacidades de networking HTTP como funcionalidades de seguridad (gestión de credenciales, almacenamiento seguro, ciclo de vida de sesión, confianza TLS, sanitización de logs). La pregunta de diseño inicial fue si estas deberían vivir en un solo módulo o estar separadas.
 
-Arguments for a single module:
-- Simpler dependency graph.
-- Credentials and HTTP headers are closely related at runtime.
+Argumentos a favor de un solo módulo:
+- Grafo de dependencias más simple.
+- Las credenciales y los headers HTTP están estrechamente relacionados en tiempo de ejecución.
 
-Arguments for separation:
-- A module that only needs secure storage (e.g., a settings module) should not pull in HTTP abstractions.
-- A module that only needs networking (e.g., a public API with no auth) should not pull in security abstractions.
-- Independent evolution — security policies change on a different cadence than transport infrastructure.
-- Independent testing — security contracts can be validated without mocking HTTP infrastructure.
-- Clearer ownership in larger teams — security team owns `security-core`, platform/infra team owns `network-core`.
+Argumentos a favor de la separación:
+- Un módulo que solo necesita almacenamiento seguro (ej. un módulo de configuración) no debería traer abstracciones HTTP.
+- Un módulo que solo necesita networking (ej. una API pública sin auth) no debería traer abstracciones de seguridad.
+- Evolución independiente — las políticas de seguridad cambian con una cadencia diferente a la infraestructura de transporte.
+- Testing independiente — los contratos de seguridad pueden validarse sin mockear infraestructura HTTP.
+- Propiedad clara en equipos grandes — el equipo de seguridad es dueño de `security-core`, el equipo de plataforma/infra es dueño de `network-core`.
 
-## Decision
+## Decisión
 
-`network-core` and `security-core` are **independent modules with zero mutual dependency**. Neither module imports any type from the other.
+`network-core` y `security-core` son **módulos independientes con cero dependencia mutua**. Ningún módulo importa ningún tipo del otro.
 
-The integration point between them is `CredentialHeaderMapper` in `security-core`, which converts a `Credential` into a plain `Map<String, String>` — no network types involved. The actual wiring (attaching credential headers to HTTP requests via `RequestInterceptor`) happens in the **consuming module** (e.g., `:sample-api`), which depends on both.
+El punto de integración entre ellos es `CredentialHeaderMapper` en `security-core`, que convierte un `Credential` en un simple `Map<String, String>` — sin tipos de red involucrados. El cableado real (adjuntar headers de credenciales a requests HTTP vía `RequestInterceptor`) ocurre en el **módulo consumidor** (ej. `:sample-api`), que depende de ambos.
 
 ```
 :network-core ──── (no dependency) ──── :security-core
@@ -33,17 +33,17 @@ The integration point between them is `CredentialHeaderMapper` in `security-core
                   (integration point)
 ```
 
-## Consequences
+## Consecuencias
 
-### Positive
+### Positivas
 
-- **Minimal dependency footprint.** A module needing only secure storage depends on `security-core` alone (only `kotlinx-coroutines` as transitive dependency). No HTTP types, no retry policies, no error classifiers pulled in.
-- **Independent versioning.** Breaking changes in the execution pipeline do not force a security-core release.
-- **Testability.** Each module can be tested in isolation with its own mock boundaries.
-- **Clear API surface.** Developers know exactly which module provides which capability.
+- **Huella mínima de dependencias.** Un módulo que solo necesita almacenamiento seguro depende únicamente de `security-core` (solo `kotlinx-coroutines` como dependencia transitiva). Sin tipos HTTP, sin políticas de reintento, sin clasificadores de errores.
+- **Versionado independiente.** Cambios breaking en el pipeline de ejecución no fuerzan un release de security-core.
+- **Testabilidad.** Cada módulo puede testearse de forma aislada con sus propios límites de mock.
+- **Superficie de API clara.** Los desarrolladores saben exactamente qué módulo provee qué capacidad.
 
-### Negative
+### Negativas
 
-- **`Diagnostic` is duplicated.** Both modules define an identical `Diagnostic` data class (`description`, `cause`, `metadata`) in different packages. A consumer that bridges errors across modules must map between them manually. This is accepted as tech debt, to be resolved by a future `:platform-common` module when 3+ shared types justify the additional module.
-- **Integration requires explicit wiring.** The auth interceptor that connects `CredentialProvider` to `RequestInterceptor` must be written in the consuming module. This is mitigated by `CredentialHeaderMapper`, which reduces the wiring to ~3 lines of code.
-- **No cross-module error flow.** A 401 HTTP error (`NetworkError.Authentication` in `network-core`) cannot directly trigger a session invalidation (`SessionController` in `security-core`) without a bridge. This is by design — the bridge belongs in the consuming layer, not in the SDK foundation.
+- **`Diagnostic` está duplicado.** Ambos módulos definen una data class `Diagnostic` idéntica (`description`, `cause`, `metadata`) en diferentes paquetes. Un consumidor que conecte errores entre módulos debe mapear entre ellos manualmente. Esto se acepta como deuda técnica, a resolver con un futuro módulo `:platform-common` cuando 3+ tipos compartidos justifiquen el módulo adicional.
+- **La integración requiere cableado explícito.** El interceptor de auth que conecta `CredentialProvider` con `RequestInterceptor` debe escribirse en el módulo consumidor. Esto se mitiga con `CredentialHeaderMapper`, que reduce el cableado a ~3 líneas de código.
+- **Sin flujo de errores entre módulos.** Un error HTTP 401 (`NetworkError.Authentication` en `network-core`) no puede disparar directamente una invalidación de sesión (`SessionController` en `security-core`) sin un puente. Esto es por diseño — el puente pertenece a la capa consumidora, no a la base del SDK.

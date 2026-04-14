@@ -1,11 +1,11 @@
-# Module Dependencies
+# Dependencias de Módulos
 
-Dependency graph showing how the project's modules relate to each other and to external libraries. Arrows point from the dependent to the dependency.
+Grafo de dependencias que muestra cómo los módulos del proyecto se relacionan entre sí y con librerías externas. Las flechas apuntan desde el dependiente hacia la dependencia.
 
 ![Module Dependencies](images/02-module-dependencies.svg)
 
 <details>
-<summary>Mermaid source</summary>
+<summary>Código fuente Mermaid</summary>
 
 ```mermaid
 graph TD
@@ -52,16 +52,16 @@ graph TD
 
 </details>
 
-## Module Roles
+## Roles de Módulos
 
-| Module | Role | External Dependencies |
+| Módulo | Rol | Dependencias Externas |
 |---|---|---|
-| `:network-core` | Pure abstractions — contracts, pipeline, error model | `kotlinx-coroutines-core` only |
-| `:network-ktor` | Ktor transport adapter | `ktor-client-core`, `ktor-client-okhttp` (Android), `ktor-client-darwin` (iOS) |
-| `:security-core` | Security abstractions — credentials, sessions, storage, trust | `kotlinx-coroutines-core` only |
-| `:sample-api` | Pilot reference module | `kotlinx-serialization-json` |
-| `:app` | Host application | Depends on all modules |
+| `:network-core` | Abstracciones puras — contratos, pipeline, modelo de errores | Solo `kotlinx-coroutines-core` |
+| `:network-ktor` | Adaptador de transporte Ktor | `ktor-client-core`, `ktor-client-okhttp` (Android), `ktor-client-darwin` (iOS) |
+| `:security-core` | Abstracciones de seguridad — credenciales, sesiones, almacenamiento, confianza | Solo `kotlinx-coroutines-core` |
+| `:sample-api` | Módulo piloto de referencia | `kotlinx-serialization-json` |
+| `:app` | Aplicación host | Depende de todos los módulos |
 
-## Critical Invariant
+## Invariante Crítica
 
-`:network-core` and `:security-core` have **zero mutual dependency**. This is enforced by design and must be preserved. They share no types — not even `Diagnostic` (which is intentionally duplicated as accepted tech debt).
+`:network-core` y `:security-core` tienen **cero dependencia mutua**. Esto se aplica por diseño y debe preservarse. No comparten tipos — ni siquiera `Diagnostic` (que está intencionalmente duplicado como deuda técnica aceptada).

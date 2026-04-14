@@ -1,33 +1,33 @@
-# Architecture Decision Records
+# Registros de Decisiones Arquitectónicas
 
-This directory contains the Architecture Decision Records (ADRs) for the Core Data Platform SDK. Each ADR documents a significant architectural decision, its context, and its consequences.
+Este directorio contiene los Architecture Decision Records (ADRs) del SDK Core Data Platform. Cada ADR documenta una decisión arquitectónica significativa, su contexto y sus consecuencias.
 
-## Index
+## Índice
 
-| ADR | Title | Status |
+| ADR | Título | Estado |
 |---|---|---|
-| [ADR-001](ADR-001-separation-network-core-security-core.md) | Separation Between network-core and security-core | Accepted |
-| [ADR-002](ADR-002-contracts-first-implementation-after.md) | Contracts First, Implementation After | Accepted |
-| [ADR-003](ADR-003-no-transport-details-in-public-api.md) | No Transport Details in the Public API | Accepted |
-| [ADR-004](ADR-004-commonmain-platformmain-separation.md) | commonMain / platformMain Separation Strategy | Accepted |
-| [ADR-005](ADR-005-centralized-safe-execution-pipeline.md) | Centralized Safe Execution Pipeline | Accepted |
-| [ADR-006](ADR-006-centralized-error-classification.md) | Centralized Error Classification | Accepted |
+| [ADR-001](ADR-001-separation-network-core-security-core.md) | Separación entre network-core y security-core | Aceptado |
+| [ADR-002](ADR-002-contracts-first-implementation-after.md) | Contratos primero, implementación después | Aceptado |
+| [ADR-003](ADR-003-no-transport-details-in-public-api.md) | Sin detalles de transporte en el API público | Aceptado |
+| [ADR-004](ADR-004-commonmain-platformmain-separation.md) | Estrategia de separación commonMain / platformMain | Aceptado |
+| [ADR-005](ADR-005-centralized-safe-execution-pipeline.md) | Pipeline de ejecución segura centralizado | Aceptado |
+| [ADR-006](ADR-006-centralized-error-classification.md) | Clasificación centralizada de errores | Aceptado |
 
-## Format
+## Formato
 
-Each ADR follows the standard format:
+Cada ADR sigue el formato estándar:
 
-- **Title** — Short descriptive name
-- **Status** — Accepted, Superseded, or Deprecated
-- **Context** — The problem and forces at play
-- **Decision** — What was decided and why
-- **Consequences** — Positive and negative outcomes
+- **Título** — Nombre descriptivo corto
+- **Estado** — Aceptado, Reemplazado o Deprecado
+- **Contexto** — El problema y las fuerzas en juego
+- **Decisión** — Qué se decidió y por qué
+- **Consecuencias** — Resultados positivos y negativos
 
-## Contributing
+## Contribuir
 
-When making a significant architectural decision:
+Al tomar una decisión arquitectónica significativa:
 
-1. Create a new file: `ADR-NNN-short-title.md`
-2. Follow the format above
-3. Add it to the index table
-4. Reference the ADR in the relevant module README if applicable
+1. Crea un nuevo archivo: `ADR-NNN-titulo-corto.md`
+2. Sigue el formato anterior
+3. Agrégalo a la tabla del índice
+4. Referencia el ADR en el README del módulo relevante si aplica

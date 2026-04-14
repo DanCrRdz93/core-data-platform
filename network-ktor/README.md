@@ -1,34 +1,34 @@
 # :network-ktor
 
-**Ktor-Based Transport Adapter for Core Data Platform**
+**Adaptador de Transporte Basado en Ktor para Core Data Platform**
 
-This module provides the concrete HTTP transport implementation by adapting the [Ktor](https://ktor.io/) client library to the `HttpEngine` interface defined in `:network-core`. It encapsulates all Ktor-specific code so that no other module in the project ever imports a Ktor type.
-
----
-
-## Purpose
-
-`:network-ktor` answers one question:
-
-> *"How do I send an `HttpRequest` over the wire and get back a `RawResponse` — using Ktor as the transport — without leaking any Ktor types to the rest of the SDK?"*
-
-It is the **only module** in the project that depends on Ktor. Replacing it with `:network-okhttp` or `:network-urlsession` would require zero changes to `:network-core`, `:security-core`, or any domain module.
+Este módulo provee la implementación concreta de transporte HTTP adaptando la librería cliente [Ktor](https://ktor.io/) a la interfaz `HttpEngine` definida en `:network-core`. Encapsula todo el código específico de Ktor para que ningún otro módulo del proyecto importe un tipo de Ktor.
 
 ---
 
-## Responsibilities
+## Propósito
 
-| Responsibility | Owner |
+`:network-ktor` responde una pregunta:
+
+> *"¿Cómo envío un `HttpRequest` por la red y obtengo un `RawResponse` — usando Ktor como transporte — sin filtrar ningún tipo de Ktor al resto del SDK?"*
+
+Es el **único módulo** en el proyecto que depende de Ktor. Reemplazarlo con `:network-okhttp` o `:network-urlsession` requeriría cero cambios en `:network-core`, `:security-core`, o cualquier módulo de dominio.
+
+---
+
+## Responsabilidades
+
+| Responsabilidad | Dueño |
 |---|---|
-| Translate `HttpRequest` → Ktor request builder | `KtorHttpEngine` |
-| Translate Ktor `HttpResponse` → `RawResponse` | `KtorHttpEngine` |
-| Configure timeouts from `NetworkConfig` | `KtorHttpEngine.create()` |
-| Classify Ktor-specific exceptions (e.g., `HttpRequestTimeoutException`) | `KtorErrorClassifier` |
-| Select the platform engine automatically (OkHttp on Android, Darwin on iOS) | Gradle dependency resolution |
+| Traducir `HttpRequest` → builder de request de Ktor | `KtorHttpEngine` |
+| Traducir `HttpResponse` de Ktor → `RawResponse` | `KtorHttpEngine` |
+| Configurar timeouts desde `NetworkConfig` | `KtorHttpEngine.create()` |
+| Clasificar excepciones específicas de Ktor (ej. `HttpRequestTimeoutException`) | `KtorErrorClassifier` |
+| Seleccionar el engine de plataforma automáticamente (OkHttp en Android, Darwin en iOS) | Resolución de dependencias Gradle |
 
 ---
 
-## Principal Contracts
+## Contratos Principales
 
 ### KtorHttpEngine
 
@@ -44,11 +44,11 @@ class KtorHttpEngine(private val client: HttpClient) : HttpEngine {
 }
 ```
 
-**Key behaviors:**
+**Comportamientos clave:**
 
-- **`expectSuccess = false`** — Ktor does NOT throw on 4xx/5xx. All HTTP status codes are returned as `RawResponse`, letting the `:network-core` pipeline handle validation and error classification.
-- **Content-Type handling** — The `Content-Type` header is extracted from `HttpRequest.headers` and applied via `ByteArrayContent`, not as a raw header. This prevents Ktor from rejecting duplicate content-type declarations.
-- **Timeouts** — Mapped directly from `NetworkConfig`:
+- **`expectSuccess = false`** — Ktor NO lanza excepciones en 4xx/5xx. Todos los códigos de estado HTTP se retornan como `RawResponse`, dejando que el pipeline de `:network-core` maneje la validación y clasificación de errores.
+- **Manejo de Content-Type** — El header `Content-Type` se extrae de `HttpRequest.headers` y se aplica vía `ByteArrayContent`, no como header crudo. Esto evita que Ktor rechace declaraciones duplicadas de content-type.
+- **Timeouts** — Mapeados directamente desde `NetworkConfig`:
   - `connectTimeout` → `connectTimeoutMillis`
   - `readTimeout` → `requestTimeoutMillis`
   - `writeTimeout` → `socketTimeoutMillis`
@@ -62,32 +62,32 @@ class KtorErrorClassifier : DefaultErrorClassifier() {
 }
 ```
 
-Extends `DefaultErrorClassifier` from `:network-core` to add **type-safe** matching for Ktor-specific exceptions:
+Extiende `DefaultErrorClassifier` de `:network-core` para agregar matching **type-safe** de excepciones específicas de Ktor:
 
-| Ktor Exception | Mapped To |
+| Excepción Ktor | Mapeada A |
 |---|---|
 | `HttpRequestTimeoutException` | `NetworkError.Timeout` |
-| *(others fall through)* | `DefaultErrorClassifier` heuristic matching |
+| *(otras caen a)* | Matching heurístico de `DefaultErrorClassifier` |
 
 ---
 
-## Internal Structure
+## Estructura Interna
 
 ```
 network-ktor/src/
 └── commonMain/kotlin/com/dancr/platform/network/ktor/
-    ├── KtorHttpEngine.kt        # HttpEngine implementation + factory
-    └── KtorErrorClassifier.kt   # Ktor-aware error classification
+    ├── KtorHttpEngine.kt        # Implementación de HttpEngine + factory
+    └── KtorErrorClassifier.kt   # Clasificación de errores consciente de Ktor
 ```
 
-Two private extension functions support the engine:
+Dos funciones de extensión privadas soportan el engine:
 
-- `HttpMethod.toKtor()` — Maps SDK `HttpMethod` enum to Ktor's `HttpMethod`.
-- `Headers.toMultiValueMap()` — Converts Ktor's `Headers` to `Map<String, List<String>>`.
+- `HttpMethod.toKtor()` — Mapea el enum `HttpMethod` del SDK al `HttpMethod` de Ktor.
+- `Headers.toMultiValueMap()` — Convierte los `Headers` de Ktor a `Map<String, List<String>>`.
 
 ---
 
-## How It Works
+## Cómo Funciona
 
 ```mermaid
 sequenceDiagram
@@ -106,7 +106,7 @@ sequenceDiagram
     K-->>E: RawResponse
 ```
 
-### Request Translation
+### Traducción de Request
 
 ```
 HttpRequest                              Ktor Request Builder
@@ -118,7 +118,7 @@ queryParams: {"page": "2"}         →    url.parameters.append("page", "2")
 body: ByteArray                    →    setBody(ByteArrayContent(bytes, contentType))
 ```
 
-### Response Translation
+### Traducción de Respuesta
 
 ```
 Ktor HttpResponse                        RawResponse
@@ -130,9 +130,9 @@ readRawBytes(): ByteArray           →    body: ByteArray?
 
 ---
 
-## Usage
+## Uso
 
-### Standard usage (via factory)
+### Uso estándar (vía factory)
 
 ```kotlin
 val config = NetworkConfig(
@@ -152,9 +152,9 @@ val executor = DefaultSafeRequestExecutor(
 )
 ```
 
-### Advanced usage (custom Ktor HttpClient)
+### Uso avanzado (HttpClient de Ktor personalizado)
 
-For cases where you need to install additional Ktor plugins:
+Para casos donde necesitas instalar plugins adicionales de Ktor:
 
 ```kotlin
 val customClient = HttpClient {
@@ -162,87 +162,87 @@ val customClient = HttpClient {
         connectTimeoutMillis = 10_000
         requestTimeoutMillis = 30_000
     }
-    // Custom plugins here
-    expectSuccess = false  // REQUIRED — must always be false
+    // Plugins personalizados aquí
+    expectSuccess = false  // REQUERIDO — siempre debe ser false
 }
 
 val engine = KtorHttpEngine(customClient)
 ```
 
-> **Warning:** If you provide a custom `HttpClient`, you **must** set `expectSuccess = false`. Otherwise Ktor will throw exceptions on 4xx/5xx, bypassing the SDK's error classification pipeline.
+> **Advertencia:** Si provees un `HttpClient` personalizado, **debes** establecer `expectSuccess = false`. De lo contrario, Ktor lanzará excepciones en 4xx/5xx, evitando el pipeline de clasificación de errores del SDK.
 
 ---
 
-## Design Decisions
+## Decisiones de Diseño
 
-| Decision | Rationale |
+| Decisión | Razón |
 |---|---|
-| **`expectSuccess = false`** | The SDK's `ResponseValidator` and `ErrorClassifier` handle all error status codes. Ktor must deliver them as responses, not exceptions. |
-| **Content-Type extracted from headers map** | Ktor has special handling for Content-Type. Passing it as both a raw header and via `setBody()` causes a duplicate header error. The engine extracts it from `HttpRequest.headers` and applies it only via `ByteArrayContent`. |
-| **Factory method `create(config)`** | Encapsulates the `HttpClient` configuration. Consumers don't need to know about Ktor's `install()` DSL. |
-| **`KtorErrorClassifier` extends `DefaultErrorClassifier`** | Only overrides `classifyThrowable()` for Ktor-specific exceptions. All other classification (response codes, heuristic class name matching) falls through to the default. |
-| **No platform source sets** | Ktor's engine selection (OkHttp vs. Darwin) is handled entirely by Gradle dependency resolution (`ktor-client-okhttp` in `androidMain.dependencies`, `ktor-client-darwin` in `iosMain.dependencies`). No Kotlin code needed in platform source sets. |
+| **`expectSuccess = false`** | El `ResponseValidator` y `ErrorClassifier` del SDK manejan todos los códigos de estado de error. Ktor debe entregarlos como respuestas, no excepciones. |
+| **Content-Type extraído del mapa de headers** | Ktor tiene manejo especial para Content-Type. Pasarlo como header crudo y vía `setBody()` causa un error de header duplicado. El engine lo extrae de `HttpRequest.headers` y lo aplica solo vía `ByteArrayContent`. |
+| **Método factory `create(config)`** | Encapsula la configuración del `HttpClient`. Los consumidores no necesitan conocer el DSL `install()` de Ktor. |
+| **`KtorErrorClassifier` extiende `DefaultErrorClassifier`** | Solo sobreescribe `classifyThrowable()` para excepciones específicas de Ktor. Toda la demás clasificación (códigos de respuesta, matching heurístico por nombre de clase) cae al default. |
+| **Sin source sets de plataforma** | La selección del engine de Ktor (OkHttp vs. Darwin) se maneja completamente por resolución de dependencias Gradle (`ktor-client-okhttp` en `androidMain.dependencies`, `ktor-client-darwin` en `iosMain.dependencies`). No se necesita código Kotlin en source sets de plataforma. |
 
 ---
 
-## Extensibility
+## Extensibilidad
 
-### Adding certificate pinning
+### Agregar certificate pinning
 
-The `KtorHttpEngine.create()` factory contains a TODO showing exactly where TLS configuration plugs in:
+El factory `KtorHttpEngine.create()` contiene un TODO mostrando exactamente dónde se conecta la configuración TLS:
 
 ```kotlin
 // Android (OkHttp): engine { config { certificatePinner(...) } }
 // iOS (Darwin):     handleChallenge in NSURLSessionDelegate
 ```
 
-This will require adding `androidMain` and `iosMain` source sets to this module.
+Esto requerirá agregar source sets `androidMain` e `iosMain` a este módulo.
 
-### Adding logging at the transport level
+### Agregar logging a nivel de transporte
 
-The factory contains a TODO for Ktor's `Logging` plugin:
+El factory contiene un TODO para el plugin `Logging` de Ktor:
 
 ```kotlin
 // install(Logging) { logger = SanitizedKtorLogger(logSanitizer) }
 ```
 
-This would wire into `LogSanitizer` from `:security-core` for redacting sensitive headers in transport-level logs.
+Esto se conectaría con `LogSanitizer` de `:security-core` para redactar headers sensibles en logs a nivel de transporte.
 
-### Replacing Ktor entirely
+### Reemplazar Ktor completamente
 
-Create a new module (e.g., `:network-okhttp`) that:
+Crea un nuevo módulo (ej. `:network-okhttp`) que:
 
-1. Implements `HttpEngine`.
-2. Extends `DefaultErrorClassifier` for library-specific exception matching.
-3. Provides a factory method.
+1. Implemente `HttpEngine`.
+2. Extienda `DefaultErrorClassifier` para matching de excepciones específicas de la librería.
+3. Provea un método factory.
 
-Change the dependency in domain modules from `:network-ktor` to `:network-okhttp`. No code changes in `:network-core` or any repository/data source.
+Cambia la dependencia en módulos de dominio de `:network-ktor` a `:network-okhttp`. Sin cambios de código en `:network-core` ni en ningún repository/data source.
 
 ---
 
-## Current Limitations
+## Limitaciones Actuales
 
-| Limitation | Context |
+| Limitación | Contexto |
 |---|---|
-| **No certificate pinning** | The TODO is documented but the `TrustPolicy` integration requires platform source sets that don't exist in this module yet. |
-| **No transport-level logging** | Ktor's `Logging` plugin is not installed. All logging should currently go through `ResponseInterceptor` and `NetworkEventObserver` in `:network-core`. |
-| **No WebSocket support** | `HttpEngine` is request-response only. WebSocket would need a separate contract. |
-| **No multipart upload** | `HttpRequest.body` is a flat `ByteArray`. Multipart would require extending the request model. |
+| **Sin certificate pinning** | El TODO está documentado pero la integración con `TrustPolicy` requiere source sets de plataforma que aún no existen en este módulo. |
+| **Sin logging a nivel de transporte** | El plugin `Logging` de Ktor no está instalado. Todo el logging actualmente debe ir a través de `ResponseInterceptor` y `NetworkEventObserver` en `:network-core`. |
+| **Sin soporte de WebSocket** | `HttpEngine` es solo request-response. WebSocket necesitaría un contrato separado. |
+| **Sin subida multipart** | `HttpRequest.body` es un `ByteArray` plano. Multipart requeriría extender el modelo de request. |
 
 ---
 
-## TODOs and Future Work
+## TODOs y Trabajo Futuro
 
-| Item | Description |
+| Ítem | Descripción |
 |---|---|
-| **Certificate pinning** | Accept `TrustPolicy` in `create()`, configure OkHttp `CertificatePinner` (Android) and Darwin `SecTrust` (iOS) via platform source sets |
-| **Logging plugin** | Install Ktor `Logging` wired to `LogSanitizer` for transport-level request/response logging |
-| **Connection pooling config** | Expose OkHttp connection pool / Darwin session config via `NetworkConfig` |
-| **Multipart support** | Extend `HttpRequest` with a multipart body model and translate to Ktor's `MultiPartFormDataContent` |
+| **Certificate pinning** | Aceptar `TrustPolicy` en `create()`, configurar `CertificatePinner` de OkHttp (Android) y `SecTrust` de Darwin (iOS) vía source sets de plataforma |
+| **Plugin de logging** | Instalar `Logging` de Ktor conectado a `LogSanitizer` para logging de request/response a nivel de transporte |
+| **Configuración de pool de conexiones** | Exponer pool de conexiones de OkHttp / configuración de sesión de Darwin vía `NetworkConfig` |
+| **Soporte multipart** | Extender `HttpRequest` con un modelo de body multipart y traducir al `MultiPartFormDataContent` de Ktor |
 
 ---
 
-## Dependencies
+## Dependencias
 
 ```kotlin
 // commonMain

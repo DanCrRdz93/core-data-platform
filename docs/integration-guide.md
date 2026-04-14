@@ -1,59 +1,59 @@
-# Integration Guide
+# Guía de Integración
 
-**How to integrate the Core Data Platform SDK into your application**
+**Cómo integrar el SDK Core Data Platform en tu aplicación**
 
-This guide walks you through every step required to consume the SDK in a new or existing Kotlin Multiplatform application — from adding dependencies to making your first request to handling errors properly.
-
----
-
-## Table of Contents
-
-- [Prerequisites](#prerequisites)
-- [Adding Dependencies](#adding-dependencies)
-- [Initial Configuration](#initial-configuration)
-- [Building the Execution Pipeline](#building-the-execution-pipeline)
-- [Creating a Domain API Module](#creating-a-domain-api-module)
-- [Consuming Results](#consuming-results)
-- [Adding Authentication](#adding-authentication)
-- [Adding Observability](#adding-observability)
-- [Multi-Environment Configuration](#multi-environment-configuration)
-- [Error Handling in Detail](#error-handling-in-detail)
-- [Architecture Recommendations](#architecture-recommendations)
-- [Common Errors and Troubleshooting](#common-errors-and-troubleshooting)
-- [What NOT to Do](#what-not-to-do)
+Esta guía te lleva paso a paso por todo lo necesario para consumir el SDK en una aplicación Kotlin Multiplatform nueva o existente — desde agregar dependencias hasta hacer tu primera request y manejar errores correctamente.
 
 ---
 
-## Prerequisites
+## Tabla de Contenidos
 
-### Tooling
+- [Prerequisitos](#prerequisitos)
+- [Agregar Dependencias](#agregar-dependencias)
+- [Configuración Inicial](#configuración-inicial)
+- [Construir el Pipeline de Ejecución](#construir-el-pipeline-de-ejecución)
+- [Crear un Módulo de Dominio](#crear-un-módulo-de-dominio)
+- [Consumir Resultados](#consumir-resultados)
+- [Agregar Autenticación](#agregar-autenticación)
+- [Agregar Observabilidad](#agregar-observabilidad)
+- [Configuración Multi-Entorno](#configuración-multi-entorno)
+- [Manejo de Errores en Detalle](#manejo-de-errores-en-detalle)
+- [Recomendaciones de Arquitectura](#recomendaciones-de-arquitectura)
+- [Errores Comunes y Soluciones](#errores-comunes-y-soluciones)
+- [Qué NO Hacer](#qué-no-hacer)
 
-| Requirement | Minimum Version | Notes |
+---
+
+## Prerequisitos
+
+### Herramientas
+
+| Requisito | Versión Mínima | Notas |
 |---|---|---|
-| Kotlin | 2.1.20 | Kotlin Multiplatform plugin enabled |
-| Gradle | 9.3.1 | Version catalog (`libs.versions.toml`) recommended |
-| AGP | 9.1.0 | Uses `com.android.kotlin.multiplatform.library` plugin |
-| Android Studio | Ladybug+ | KMP support required |
-| Xcode | 15+ | For iOS compilation |
+| Kotlin | 2.1.20 | Plugin Kotlin Multiplatform habilitado |
+| Gradle | 9.3.1 | Version catalog (`libs.versions.toml`) recomendado |
+| AGP | 9.1.0 | Usa el plugin `com.android.kotlin.multiplatform.library` |
+| Android Studio | Ladybug+ | Soporte KMP requerido |
+| Xcode | 15+ | Para compilación iOS |
 | Android `compileSdk` | 36 | |
 | Android `minSdk` | 29 | Android 10+ |
 
-### Knowledge
+### Conocimientos Previos
 
-You should be familiar with:
+Deberías estar familiarizado con:
 
-- Kotlin coroutines (`suspend`, `Flow`, `StateFlow`)
-- Kotlin Multiplatform source set model (`commonMain`, `androidMain`, `iosMain`)
-- Kotlin sealed classes and `when` expressions
-- Gradle multi-module projects
+- Coroutines de Kotlin (`suspend`, `Flow`, `StateFlow`)
+- Modelo de source sets de Kotlin Multiplatform (`commonMain`, `androidMain`, `iosMain`)
+- Sealed classes y expresiones `when` de Kotlin
+- Proyectos multi-módulo con Gradle
 
 ---
 
-## Adding Dependencies
+## Agregar Dependencias
 
-### Step 1: Register the SDK modules
+### Paso 1: Registrar los módulos del SDK
 
-If the SDK lives as a local composite build or included modules, add them to your `settings.gradle.kts`:
+Si el SDK vive como un composite build local o módulos incluidos, agrégalos a tu `settings.gradle.kts`:
 
 ```kotlin
 // settings.gradle.kts
@@ -62,7 +62,7 @@ include(":network-ktor")
 include(":security-core")
 ```
 
-If the SDK is published to a Maven repository, use coordinates instead (replace with your actual group/version):
+Si el SDK está publicado en un repositorio Maven, usa coordenadas (reemplaza con tu grupo/versión real):
 
 ```kotlin
 // build.gradle.kts of your domain module
@@ -73,7 +73,7 @@ dependencies {
 }
 ```
 
-### Step 2: Add dependencies to your domain module
+### Paso 2: Agregar dependencias a tu módulo de dominio
 
 ```kotlin
 // your-domain-module/build.gradle.kts
@@ -96,38 +96,38 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            // SDK modules
+            // Módulos del SDK
             implementation(project(":network-core"))
             implementation(project(":network-ktor"))
             implementation(project(":security-core"))
 
-            // Required for coroutines
+            // Requerido para coroutines
             implementation(libs.kotlinx.coroutines.core)
 
-            // Required for JSON serialization in your DTOs
+            // Requerido para serialización JSON en tus DTOs
             implementation(libs.kotlinx.serialization.json)
         }
     }
 }
 ```
 
-### What each dependency provides
+### Qué te da cada dependencia
 
-| Dependency | You get |
+| Dependencia | Obtienes |
 |---|---|
 | `:network-core` | `HttpRequest`, `SafeRequestExecutor`, `NetworkResult`, `NetworkError`, `RemoteDataSource`, `NetworkConfig`, `RetryPolicy`, `RequestInterceptor`, `ResponseInterceptor`, `NetworkEventObserver` |
-| `:network-ktor` | `KtorHttpEngine`, `KtorErrorClassifier` — the concrete transport |
+| `:network-ktor` | `KtorHttpEngine`, `KtorErrorClassifier` — el transporte concreto |
 | `:security-core` | `Credential`, `CredentialProvider`, `CredentialHeaderMapper`, `SessionController`, `SecretStore`, `TrustPolicy`, `LogSanitizer` |
 
-> **Tip:** If your module does not need authentication or security features, you can skip `:security-core`. The networking stack works independently.
+> **Tip:** Si tu módulo no necesita autenticación ni funcionalidades de seguridad, puedes omitir `:security-core`. El stack de networking funciona de forma independiente.
 
 ---
 
-## Initial Configuration
+## Configuración Inicial
 
 ### NetworkConfig
 
-Every application starts by defining a `NetworkConfig` — the base configuration shared by all requests:
+Toda aplicación comienza definiendo un `NetworkConfig` — la configuración base compartida por todas las requests:
 
 ```kotlin
 import com.dancr.platform.network.config.NetworkConfig
@@ -153,30 +153,30 @@ val networkConfig = NetworkConfig(
 )
 ```
 
-### Configuration parameters
+### Parámetros de configuración
 
-| Parameter | Type | Default | Description |
+| Parámetro | Tipo | Valor por defecto | Descripción |
 |---|---|---|---|
-| `baseUrl` | `String` | *(required)* | Base URL prepended to all request paths. Must not be blank. |
-| `defaultHeaders` | `Map<String, String>` | `emptyMap()` | Headers added to every request. Per-request headers override these. |
-| `connectTimeout` | `Duration` | `30.seconds` | TCP connection timeout |
-| `readTimeout` | `Duration` | `30.seconds` | Full request timeout (Ktor `requestTimeoutMillis`) |
-| `writeTimeout` | `Duration` | `30.seconds` | Socket timeout (Ktor `socketTimeoutMillis`) |
-| `retryPolicy` | `RetryPolicy` | `RetryPolicy.None` | Automatic retry strategy for retryable errors |
+| `baseUrl` | `String` | *(requerido)* | URL base antepuesta a todas las rutas de request. No puede estar vacía. |
+| `defaultHeaders` | `Map<String, String>` | `emptyMap()` | Headers agregados a cada request. Los headers por request sobreescriben estos. |
+| `connectTimeout` | `Duration` | `30.seconds` | Timeout de conexión TCP |
+| `readTimeout` | `Duration` | `30.seconds` | Timeout completo de request (Ktor `requestTimeoutMillis`) |
+| `writeTimeout` | `Duration` | `30.seconds` | Timeout de socket (Ktor `socketTimeoutMillis`) |
+| `retryPolicy` | `RetryPolicy` | `RetryPolicy.None` | Estrategia de reintento automático para errores reintentables |
 
-### Retry policy options
+### Opciones de política de reintento
 
 ```kotlin
-// No retries (default)
+// Sin reintentos (por defecto)
 RetryPolicy.None
 
-// Fixed delay between retries
+// Delay fijo entre reintentos
 RetryPolicy.FixedDelay(
     maxRetries = 3,
     delay = 2.seconds
 )
 
-// Exponential backoff
+// Backoff exponencial
 RetryPolicy.ExponentialBackoff(
     maxRetries = 3,
     initialDelay = 1.seconds,
@@ -187,11 +187,11 @@ RetryPolicy.ExponentialBackoff(
 
 ---
 
-## Building the Execution Pipeline
+## Construir el Pipeline de Ejecución
 
-The execution pipeline is where all the pieces come together. Build it once per API configuration and share it across data sources.
+El pipeline de ejecución es donde todas las piezas se unen. Constrúyelo una vez por configuración de API y compártelo entre data sources.
 
-### Minimal setup (no auth, no observability)
+### Configuración mínima (sin auth, sin observabilidad)
 
 ```kotlin
 import com.dancr.platform.network.execution.DefaultSafeRequestExecutor
@@ -207,7 +207,7 @@ val executor = DefaultSafeRequestExecutor(
 )
 ```
 
-### Full setup (auth + observability)
+### Configuración completa (auth + observabilidad)
 
 ```kotlin
 val executor = DefaultSafeRequestExecutor(
@@ -215,29 +215,29 @@ val executor = DefaultSafeRequestExecutor(
     config = networkConfig,
     classifier = KtorErrorClassifier(),
     interceptors = listOf(
-        authInterceptor,           // injects Authorization header
-        tracingInterceptor         // injects X-Trace-Id header
+        authInterceptor,           // inyecta header Authorization
+        tracingInterceptor         // inyecta header X-Trace-Id
     ),
     responseInterceptors = listOf(
-        loggingResponseInterceptor // logs response status
+        loggingResponseInterceptor // registra el status de la respuesta
     ),
     observers = listOf(
-        metricsObserver,           // records latency, error rates
-        analyticsObserver          // tracks request patterns
+        metricsObserver,           // registra latencia, tasa de errores
+        analyticsObserver          // rastrea patrones de requests
     )
 )
 ```
 
-### Lifecycle management
+### Gestión del ciclo de vida
 
-The `KtorHttpEngine` wraps a Ktor `HttpClient`. You should:
+El `KtorHttpEngine` envuelve un `HttpClient` de Ktor. Debes:
 
-1. **Create one engine per configuration** — not one per request.
-2. **Call `engine.close()`** when the application is shutting down or the scope is cancelled.
-3. If using a DI framework (Koin, Hilt), register the engine as a singleton scoped to the application lifecycle.
+1. **Crear un engine por configuración** — no uno por request.
+2. **Llamar `engine.close()`** cuando la aplicación se cierra o el scope se cancela.
+3. Si usas un framework de DI (Koin, Hilt), registra el engine como singleton con scope del ciclo de vida de la aplicación.
 
 ```kotlin
-// In your DI module
+// En tu módulo de DI
 single { KtorHttpEngine.create(networkConfig) }
 single<SafeRequestExecutor> {
     DefaultSafeRequestExecutor(
@@ -247,27 +247,27 @@ single<SafeRequestExecutor> {
     )
 }
 
-// On app shutdown
+// Al cerrar la app
 onClose { get<HttpEngine>().close() }
 ```
 
 ---
 
-## Creating a Domain API Module
+## Crear un Módulo de Dominio
 
-Follow this layered structure for every API domain you integrate:
+Sigue esta estructura por capas para cada dominio de API que integres:
 
 ```
-your-module/src/commonMain/kotlin/com/yourcompany/yourmodule/
-├── dto/                  # Technical models matching JSON
-├── model/                # Clean domain models
-├── mapper/               # DTO → Domain conversion
-├── datasource/           # Builds requests, delegates to executor
-├── repository/           # Maps DTO results to domain results
-└── di/                   # Factory wiring
+tu-modulo/src/commonMain/kotlin/com/tuempresa/tumodulo/
+├── dto/                  # Modelos técnicos que coinciden con el JSON
+├── model/                # Modelos de dominio limpios
+├── mapper/               # Conversión DTO → Dominio
+├── datasource/           # Construye requests, delega al executor
+├── repository/           # Mapea resultados de DTO a resultados de dominio
+└── di/                   # Cableado del factory
 ```
 
-### Step 1: Define DTOs
+### Paso 1: Definir DTOs
 
 ```kotlin
 import kotlinx.serialization.SerialName
@@ -290,13 +290,13 @@ data class OrderItemDto(
 )
 ```
 
-**Rules:**
-- Always `@Serializable`.
-- Use `@SerialName` when JSON key differs from Kotlin property name.
-- Default values for optional fields (`= emptyList()`, `= null`).
-- No business logic here — these are pure data carriers.
+**Reglas:**
+- Siempre `@Serializable`.
+- Usa `@SerialName` cuando la clave JSON difiere del nombre de la propiedad Kotlin.
+- Valores por defecto para campos opcionales (`= emptyList()`, `= null`).
+- Sin lógica de negocio aquí — son transportadores de datos puros.
 
-### Step 2: Define domain models
+### Paso 2: Definir modelos de dominio
 
 ```kotlin
 data class Order(
@@ -310,12 +310,12 @@ data class Order(
 enum class OrderStatus { PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED }
 ```
 
-**Rules:**
-- No `@Serializable`.
-- Use your app's vocabulary, not the API's.
-- Flatten nested structures if consumers don't need them.
+**Reglas:**
+- Sin `@Serializable`.
+- Usa el vocabulario de tu app, no el del API.
+- Aplana estructuras anidadas si los consumidores no las necesitan.
 
-### Step 3: Create a mapper
+### Paso 3: Crear un mapper
 
 ```kotlin
 object OrderMapper {
@@ -338,7 +338,7 @@ object OrderMapper {
 }
 ```
 
-### Step 4: Build the data source
+### Paso 4: Construir el data source
 
 ```kotlin
 import com.dancr.platform.network.client.HttpMethod
@@ -388,14 +388,14 @@ class OrderRemoteDataSource(
 }
 ```
 
-**Key points:**
-- Extend `RemoteDataSource` — this gives you `protected fun execute()`.
-- Inject `SafeRequestExecutor` — the interface, not the concrete class.
-- Create `Json` once, reuse across methods.
-- `ignoreUnknownKeys = true` protects against API evolution.
-- Paths are relative — the executor prepends `baseUrl`.
+**Puntos clave:**
+- Extiende `RemoteDataSource` — esto te da `protected fun execute()`.
+- Inyecta `SafeRequestExecutor` — la interfaz, no la clase concreta.
+- Crea `Json` una vez, reúsalo en todos los métodos.
+- `ignoreUnknownKeys = true` protege contra evolución del API.
+- Las rutas son relativas — el executor antepone `baseUrl`.
 
-### Step 5: Create the repository
+### Paso 5: Crear el repository
 
 ```kotlin
 import com.dancr.platform.network.result.NetworkResult
@@ -412,9 +412,9 @@ class OrderRepository(
 }
 ```
 
-The repository's sole job is mapping `NetworkResult<Dto>` → `NetworkResult<Model>` using `NetworkResult.map()`.
+El único trabajo del repository es mapear `NetworkResult<Dto>` → `NetworkResult<Model>` usando `NetworkResult.map()`.
 
-### Step 6: Wire it together
+### Paso 6: Cablear todo junto
 
 ```kotlin
 import com.dancr.platform.network.config.NetworkConfig
@@ -457,9 +457,9 @@ object OrderApiFactory {
 
 ---
 
-## Consuming Results
+## Consumir Resultados
 
-### In a ViewModel (Android)
+### En un ViewModel (Android)
 
 ```kotlin
 class OrderViewModel(private val repository: OrderRepository) : ViewModel() {
@@ -490,19 +490,19 @@ sealed interface OrderScreenState {
 }
 ```
 
-### Chaining operations
+### Encadenar operaciones
 
 ```kotlin
-// Sequential: fetch order, then fetch payment
+// Secuencial: obtener orden, luego obtener pago
 val result: NetworkResult<PaymentInfo> = repository.getOrder(orderId)
     .flatMap { order -> paymentRepository.getPayment(order.paymentId) }
 
-// Transform success data
+// Transformar datos exitosos
 val formatted: NetworkResult<String> = repository.getOrder(orderId)
     .map { order -> "${order.status}: ${order.totalAmount}" }
 ```
 
-### Side effects
+### Efectos secundarios
 
 ```kotlin
 repository.getOrders()
@@ -514,32 +514,32 @@ repository.getOrders()
     )
 ```
 
-### Extracting raw values
+### Extraer valores directamente
 
 ```kotlin
-// Nullable extraction (use sparingly)
+// Extracción nullable (usar con moderación)
 val orders: List<Order>? = repository.getOrders().getOrNull()
 val error: NetworkError? = repository.getOrders().errorOrNull()
 
-// Boolean checks
+// Verificaciones booleanas
 if (result.isSuccess) { /* ... */ }
 if (result.isFailure) { /* ... */ }
 ```
 
-> **Recommendation:** Prefer `.fold()` for exhaustive handling. Use `.getOrNull()` only in tests or when you genuinely don't care about the failure case.
+> **Recomendación:** Prefiere `.fold()` para manejo exhaustivo. Usa `.getOrNull()` solo en tests o cuando genuinamente no te importa el caso de fallo.
 
 ---
 
-## Adding Authentication
+## Agregar Autenticación
 
-### Step 1: Implement CredentialProvider
+### Paso 1: Implementar CredentialProvider
 
 ```kotlin
 import com.dancr.platform.security.credential.Credential
 import com.dancr.platform.security.credential.CredentialProvider
 
 class TokenCredentialProvider(
-    private val tokenStore: TokenStore  // your app's token management
+    private val tokenStore: TokenStore  // tu gestión de tokens
 ) : CredentialProvider {
 
     override suspend fun current(): Credential? {
@@ -549,7 +549,7 @@ class TokenCredentialProvider(
 }
 ```
 
-### Step 2: Build the auth interceptor
+### Paso 2: Construir el interceptor de auth
 
 ```kotlin
 import com.dancr.platform.network.execution.RequestInterceptor
@@ -564,16 +564,16 @@ fun authInterceptor(provider: CredentialProvider) =
     }
 ```
 
-`CredentialHeaderMapper` handles all credential types automatically:
+`CredentialHeaderMapper` maneja todos los tipos de credencial automáticamente:
 
-| Credential | Generated Header |
+| Credencial | Header Generado |
 |---|---|
 | `Credential.Bearer("abc")` | `Authorization: Bearer abc` |
 | `Credential.ApiKey("key", "X-API-Key")` | `X-API-Key: key` |
 | `Credential.Basic("user", "pass")` | `Authorization: Basic dXNlcjpwYXNz` |
-| `Credential.Custom("OAuth", props)` | All entries in `props` as headers |
+| `Credential.Custom("OAuth", props)` | Todas las entradas de `props` como headers |
 
-### Step 3: Wire into the executor
+### Paso 3: Cablear al executor
 
 ```kotlin
 val executor = DefaultSafeRequestExecutor(
@@ -586,11 +586,11 @@ val executor = DefaultSafeRequestExecutor(
 
 ---
 
-## Adding Observability
+## Agregar Observabilidad
 
-### Implement NetworkEventObserver
+### Implementar NetworkEventObserver
 
-Only override the callbacks you need — all methods have default no-op implementations:
+Solo sobreescribe los callbacks que necesites — todos los métodos tienen implementaciones no-op por defecto:
 
 ```kotlin
 import com.dancr.platform.network.observability.NetworkEventObserver
@@ -641,7 +641,7 @@ class AppMetricsObserver(
 }
 ```
 
-### Wire observers
+### Cablear observers
 
 ```kotlin
 val executor = DefaultSafeRequestExecutor(
@@ -657,9 +657,9 @@ val executor = DefaultSafeRequestExecutor(
 
 ---
 
-## Multi-Environment Configuration
+## Configuración Multi-Entorno
 
-Define per-environment configs and select at build time or startup:
+Define configuraciones por entorno y selecciona en tiempo de compilación o inicio:
 
 ```kotlin
 object ApiConfigs {
@@ -669,7 +669,7 @@ object ApiConfigs {
         defaultHeaders = mapOf("Accept" to "application/json"),
         connectTimeout = 30.seconds,
         readTimeout = 60.seconds,
-        retryPolicy = RetryPolicy.None  // fail fast in dev
+        retryPolicy = RetryPolicy.None  // fallo rápido en dev
     )
 
     val staging = NetworkConfig(
@@ -693,7 +693,7 @@ object ApiConfigs {
     )
 }
 
-// At initialization
+// Al inicializar
 val config = when (BuildConfig.FLAVOR) {
     "dev" -> ApiConfigs.development
     "staging" -> ApiConfigs.staging
@@ -704,31 +704,31 @@ val repository = OrderApiFactory.create(config, credentialProvider)
 
 ---
 
-## Error Handling in Detail
+## Manejo de Errores en Detalle
 
-### Error types and recommended UI responses
+### Tipos de error y respuesta recomendada en UI
 
-| Error | When it happens | Recommended UI |
+| Error | Cuándo ocurre | UI Recomendada |
 |---|---|---|
-| `Connectivity` | No internet, DNS failure, server unreachable | "Check your connection" + retry button |
-| `Timeout` | Server too slow | "Server is slow, please try again" + retry button |
-| `Cancelled` | User navigated away, scope cancelled | No UI — operation was intentionally cancelled |
-| `Authentication` | 401 — token expired or invalid | Redirect to login, or trigger silent token refresh |
-| `Authorization` | 403 — user lacks permission | "You don't have access to this feature" |
-| `ClientError` | 4xx (other) — bad request | "Something went wrong" + log `diagnostic` |
-| `ServerError` | 5xx — server-side failure | "We're experiencing issues" (auto-retried) |
-| `Serialization` | Response body doesn't match DTO | "Something went wrong" + log `diagnostic` urgently (API contract mismatch) |
-| `ResponseValidation` | Custom validator rejected a 2xx response | Depends on your validator's logic |
-| `Unknown` | Unclassified exception | "Something went wrong" + log `diagnostic` |
+| `Connectivity` | Sin internet, fallo DNS, servidor inalcanzable | "Revisa tu conexión" + botón reintentar |
+| `Timeout` | Servidor muy lento | "El servidor está lento, intenta de nuevo" + botón reintentar |
+| `Cancelled` | El usuario navegó fuera, scope cancelado | Sin UI — la operación fue cancelada intencionalmente |
+| `Authentication` | 401 — token expirado o inválido | Redirigir a login, o disparar refresh silencioso |
+| `Authorization` | 403 — el usuario no tiene permisos | "No tienes acceso a esta funcionalidad" |
+| `ClientError` | 4xx (otros) — request inválida | "Algo salió mal" + loguear `diagnostic` |
+| `ServerError` | 5xx — fallo del servidor | "Estamos con problemas" (reintentado automáticamente) |
+| `Serialization` | El body de respuesta no coincide con el DTO | "Algo salió mal" + loguear `diagnostic` urgentemente (desajuste de contrato API) |
+| `ResponseValidation` | Un validador custom rechazó una respuesta 2xx | Depende de la lógica de tu validador |
+| `Unknown` | Excepción no clasificada | "Algo salió mal" + loguear `diagnostic` |
 
-### Pattern: exhaustive error handling
+### Patrón: manejo exhaustivo de errores
 
 ```kotlin
 result.onFailure { error ->
     when (error) {
         is NetworkError.Connectivity -> showRetryBanner("No connection")
         is NetworkError.Timeout -> showRetryBanner("Request timed out")
-        is NetworkError.Cancelled -> { /* ignore — user action */ }
+        is NetworkError.Cancelled -> { /* ignorar — acción del usuario */ }
 
         is NetworkError.Authentication -> navigateToLogin()
         is NetworkError.Authorization -> showAccessDenied()
@@ -743,16 +743,16 @@ result.onFailure { error ->
         is NetworkError.Unknown -> showGenericError(error.message)
     }
 
-    // Always log diagnostic internally (never show to user)
+    // Siempre loguear diagnostic internamente (nunca mostrar al usuario)
     error.diagnostic?.let { d ->
         logger.error("${error::class.simpleName}: ${d.description}", d.cause)
     }
 }
 ```
 
-### Pattern: simplified error handling
+### Patrón: manejo simplificado de errores
 
-For screens that don't need per-type handling:
+Para pantallas que no necesitan manejo por tipo:
 
 ```kotlin
 result.fold(
@@ -761,43 +761,43 @@ result.fold(
 )
 ```
 
-`error.message` is always user-safe and human-readable.
+`error.message` siempre es seguro para el usuario y legible.
 
 ---
 
-## Architecture Recommendations
+## Recomendaciones de Arquitectura
 
-### Do
+### Hacer
 
-- **One `NetworkConfig` per API base URL.** If your app talks to `api.example.com` and `auth.example.com`, create two configs and two executors.
-- **One factory per domain.** `OrderApiFactory`, `PaymentApiFactory`, `UserApiFactory`. Each wires its own data source and repository.
-- **Inject `SafeRequestExecutor`, never `DefaultSafeRequestExecutor`.** Code to the interface.
-- **Use `RequestContext` for tracing.** Pass an `operationId` so you can correlate logs, metrics, and traces to specific operations.
-- **Handle `NetworkError.Serialization` as a critical signal.** It means the API response doesn't match your DTOs. This is a deployment issue, not a transient error.
-- **Keep mappers pure.** No I/O, no state, no side effects. Just input → output.
-- **Create `Json` once per data source.** Not per request.
+- **Un `NetworkConfig` por URL base de API.** Si tu app habla con `api.example.com` y `auth.example.com`, crea dos configs y dos executors.
+- **Un factory por dominio.** `OrderApiFactory`, `PaymentApiFactory`, `UserApiFactory`. Cada uno cablea su propio data source y repository.
+- **Inyectar `SafeRequestExecutor`, nunca `DefaultSafeRequestExecutor`.** Programa contra la interfaz.
+- **Usar `RequestContext` para trazabilidad.** Pasa un `operationId` para poder correlacionar logs, métricas y trazas con operaciones específicas.
+- **Manejar `NetworkError.Serialization` como señal crítica.** Significa que la respuesta del API no coincide con tus DTOs. Es un problema de despliegue, no un error transitorio.
+- **Mantener los mappers puros.** Sin I/O, sin estado, sin efectos secundarios. Solo entrada → salida.
+- **Crear `Json` una vez por data source.** No por request.
 
 ```kotlin
-// ✅ Good
+// ✅ Correcto
 class MyDataSource(executor: SafeRequestExecutor) : RemoteDataSource(executor) {
     private val json = Json { ignoreUnknownKeys = true }
     // ... use json in every method
 }
 
-// ❌ Bad
+// ❌ Incorrecto
 suspend fun fetchData(): NetworkResult<Data> = execute(
     request = HttpRequest(...),
     deserialize = { response ->
-        val json = Json { ignoreUnknownKeys = true } // wasteful!
+        val json = Json { ignoreUnknownKeys = true } // ¡desperdicio!
         json.decodeFromString(response.body!!.decodeToString())
     }
 )
 ```
 
-### Test strategy
+### Estrategia de testing
 
 ```kotlin
-// Mock the executor for data source tests
+// Mockear el executor para tests de data source
 class FakeExecutor(private val result: NetworkResult<*>) : SafeRequestExecutor {
     override suspend fun <T> execute(
         request: HttpRequest,
@@ -806,7 +806,7 @@ class FakeExecutor(private val result: NetworkResult<*>) : SafeRequestExecutor {
     ): NetworkResult<T> = result as NetworkResult<T>
 }
 
-// Test the data source
+// Testear el data source
 @Test
 fun `fetchOrders returns mapped orders on success`() = runTest {
     val fakeResponse = RawResponse(200, emptyMap(), ordersJson.encodeToByteArray())
@@ -820,19 +820,19 @@ fun `fetchOrders returns mapped orders on success`() = runTest {
 
 ---
 
-## Common Errors and Troubleshooting
+## Errores Comunes y Soluciones
 
 ### 1. `Unresolved reference: KtorHttpEngine`
 
-**Cause:** Missing `:network-ktor` dependency.
+**Causa:** Falta la dependencia `:network-ktor`.
 
-**Fix:** Add `implementation(project(":network-ktor"))` to your module's `commonMain.dependencies`.
+**Solución:** Agrega `implementation(project(":network-ktor"))` a los `commonMain.dependencies` de tu módulo.
 
-### 2. `Unresolved reference: Json` or `@Serializable`
+### 2. `Unresolved reference: Json` o `@Serializable`
 
-**Cause:** Missing serialization plugin or dependency.
+**Causa:** Falta el plugin o la dependencia de serialización.
 
-**Fix:**
+**Solución:**
 ```kotlin
 // build.gradle.kts
 plugins {
@@ -844,15 +844,15 @@ implementation(libs.kotlinx.serialization.json)
 
 ### 3. `kotlinx.serialization.json.internal.JsonDecodingException: Unexpected JSON token`
 
-**Cause:** Response body doesn't match your DTO structure.
+**Causa:** El body de la respuesta no coincide con la estructura de tu DTO.
 
-**Fix:** Verify your `@Serializable` data class matches the actual API response. Use `ignoreUnknownKeys = true` on your `Json` instance to tolerate new fields.
+**Solución:** Verifica que tu data class `@Serializable` coincida con la respuesta real del API. Usa `ignoreUnknownKeys = true` en tu instancia de `Json` para tolerar campos nuevos.
 
-### 4. `NetworkError.Serialization` on every request
+### 4. `NetworkError.Serialization` en cada request
 
-**Cause:** Often a null body (`response.body!!` force-unwrap failing). The API might return 204 No Content or an empty body.
+**Causa:** Frecuentemente un body nulo (fallo del force-unwrap `response.body!!`). El API podría retornar 204 No Content o un body vacío.
 
-**Fix:** Guard against null body in your deserialize lambda:
+**Solución:** Protege contra body nulo en tu lambda de deserialización:
 
 ```kotlin
 deserialize = { response ->
@@ -862,17 +862,17 @@ deserialize = { response ->
 }
 ```
 
-### 5. `NetworkError.Connectivity` when device has internet
+### 5. `NetworkError.Connectivity` cuando el dispositivo tiene internet
 
-**Cause:** Incorrect `baseUrl` in `NetworkConfig`, or the server is down.
+**Causa:** `baseUrl` incorrecto en `NetworkConfig`, o el servidor está caído.
 
-**Fix:** Check `error.diagnostic?.description` for the underlying exception message. Verify the base URL is correct and reachable.
+**Solución:** Revisa `error.diagnostic?.description` para ver el mensaje de la excepción subyacente. Verifica que la URL base sea correcta y alcanzable.
 
-### 6. Duplicate `Content-Type` header error from Ktor
+### 6. Error de header `Content-Type` duplicado de Ktor
 
-**Cause:** Setting `Content-Type` in both `HttpRequest.headers` and via the body.
+**Causa:** Se establece `Content-Type` tanto en `HttpRequest.headers` como vía el body.
 
-**Fix:** `KtorHttpEngine` already extracts `Content-Type` from your headers and passes it to the body. Just set it in your `HttpRequest.headers`:
+**Solución:** `KtorHttpEngine` ya extrae `Content-Type` de tus headers y lo pasa al body. Solo establécelo en tu `HttpRequest.headers`:
 
 ```kotlin
 HttpRequest(
@@ -883,26 +883,26 @@ HttpRequest(
 )
 ```
 
-### 7. Auth headers not appearing in requests
+### 7. Headers de auth no aparecen en las requests
 
-**Cause:** `CredentialProvider.current()` returns `null`, or the auth interceptor is not in the interceptors list.
+**Causa:** `CredentialProvider.current()` retorna `null`, o el interceptor de auth no está en la lista de interceptors.
 
-**Fix:** Verify your `CredentialProvider` returns a non-null `Credential`, and that the interceptor is passed to `DefaultSafeRequestExecutor`.
+**Solución:** Verifica que tu `CredentialProvider` retorne un `Credential` no nulo, y que el interceptor se pase al `DefaultSafeRequestExecutor`.
 
-### 8. Retries not happening
+### 8. Los reintentos no están ocurriendo
 
-**Cause:** `RetryPolicy.None` is the default. Or the error type is not retryable.
+**Causa:** `RetryPolicy.None` es el valor por defecto. O el tipo de error no es reintentable.
 
-**Fix:** Set a retry policy in `NetworkConfig`, and verify that the error type has `isRetryable = true`. Only `Connectivity`, `Timeout`, and `ServerError` are retryable by default.
+**Solución:** Establece una política de reintento en `NetworkConfig`, y verifica que el tipo de error tenga `isRetryable = true`. Solo `Connectivity`, `Timeout` y `ServerError` son reintentables por defecto.
 
 ---
 
-## What NOT to Do
+## Qué NO Hacer
 
-### ❌ Don't import Ktor types in domain modules
+### ❌ No importes tipos de Ktor en módulos de dominio
 
 ```kotlin
-// WRONG — leaks transport details
+// INCORRECTO — filtra detalles de transporte
 import io.ktor.client.statement.HttpResponse
 
 class MyDataSource {
@@ -910,54 +910,54 @@ class MyDataSource {
 }
 ```
 
-Use `HttpRequest`, `RawResponse`, and `SafeRequestExecutor` exclusively.
+Usa `HttpRequest`, `RawResponse` y `SafeRequestExecutor` exclusivamente.
 
-### ❌ Don't create an HttpEngine per request
+### ❌ No crees un HttpEngine por request
 
 ```kotlin
-// WRONG — creates a new HTTP client on every call
+// INCORRECTO — crea un nuevo cliente HTTP en cada llamada
 suspend fun fetchData() {
-    val engine = KtorHttpEngine.create(config)  // expensive!
+    val engine = KtorHttpEngine.create(config)  // ¡costoso!
     executor.execute(...)
     engine.close()
 }
 ```
 
-Create one engine at startup, share it.
+Crea un engine al inicio, compártelo.
 
-### ❌ Don't catch NetworkResult.Failure as an exception
+### ❌ No captures NetworkResult.Failure como excepción
 
 ```kotlin
-// WRONG — NetworkResult is a value, not an exception
+// INCORRECTO — NetworkResult es un valor, no una excepción
 try {
     val result = repository.getOrders()
-} catch (e: NetworkResult.Failure) {  // This doesn't compile
+} catch (e: NetworkResult.Failure) {  // Esto no compila
     ...
 }
 ```
 
-Use `.fold()`, `.onFailure()`, or `when (result)`.
+Usa `.fold()`, `.onFailure()`, o `when (result)`.
 
-### ❌ Don't show `diagnostic` to users
+### ❌ No muestres `diagnostic` al usuario
 
 ```kotlin
-// WRONG — diagnostic contains stack traces and internal details
+// INCORRECTO — diagnostic contiene stack traces y detalles internos
 showToast(error.diagnostic?.description ?: "Error")
 
-// RIGHT — message is always user-safe
+// CORRECTO — message siempre es seguro para el usuario
 showToast(error.message)
 ```
 
-### ❌ Don't put business logic in interceptors
+### ❌ No pongas lógica de negocio en interceptors
 
 ```kotlin
-// WRONG — interceptors are for infrastructure
+// INCORRECTO — los interceptors son para infraestructura
 val priceValidator = RequestInterceptor { request, _ ->
     if (calculateTotal(request) > MAX_ORDER) throw TooExpensiveException()
     request
 }
 
-// RIGHT — put business logic in the repository or use case
+// CORRECTO — pon lógica de negocio en el repository o use case
 class OrderRepository {
     suspend fun placeOrder(order: Order): NetworkResult<Confirmation> {
         require(order.total <= MAX_ORDER) { "Order exceeds limit" }
@@ -966,12 +966,12 @@ class OrderRepository {
 }
 ```
 
-### ❌ Don't depend on `network-core` from `security-core` (or vice versa)
+### ❌ No dependas de `network-core` desde `security-core` (ni viceversa)
 
-These modules are intentionally independent. If you need to bridge them (e.g., invalidate session on 401), do it in the consuming layer:
+Estos módulos son intencionalmente independientes. Si necesitas conectarlos (ej. invalidar sesión en un 401), hazlo en la capa consumidora:
 
 ```kotlin
-// In your app module — not in the SDK
+// En tu módulo de app — no en el SDK
 repository.getOrders().onFailure { error ->
     if (error is NetworkError.Authentication) {
         sessionController.endSession()
@@ -979,17 +979,17 @@ repository.getOrders().onFailure { error ->
 }
 ```
 
-### ❌ Don't hardcode base URLs in data sources
+### ❌ No hardcodees URLs base en data sources
 
 ```kotlin
-// WRONG
+// INCORRECTO
 class MyDataSource {
     private val baseUrl = "https://api.prod.example.com"
 }
 
-// RIGHT — base URL comes from NetworkConfig
+// CORRECTO — la URL base viene de NetworkConfig
 class MyDataSource(executor: SafeRequestExecutor) : RemoteDataSource(executor) {
-    // path is relative; executor prepends baseUrl
+    // la ruta es relativa; el executor antepone baseUrl
     suspend fun fetch() = execute(
         request = HttpRequest(path = "/data"),
         deserialize = { ... }
@@ -997,17 +997,17 @@ class MyDataSource(executor: SafeRequestExecutor) : RemoteDataSource(executor) {
 }
 ```
 
-### ❌ Don't share a single executor across different base URLs
+### ❌ No compartas un solo executor entre diferentes URLs base
 
 ```kotlin
-// WRONG — both APIs use the same baseUrl from one config
+// INCORRECTO — ambas APIs usan la misma baseUrl de una sola config
 val executor = DefaultSafeRequestExecutor(engine, configForApiA, ...)
-val repoA = OrderRepository(OrderDataSource(executor))    // correct baseUrl
-val repoB = PaymentRepository(PaymentDataSource(executor)) // wrong baseUrl!
+val repoA = OrderRepository(OrderDataSource(executor))    // baseUrl correcto
+val repoB = PaymentRepository(PaymentDataSource(executor)) // ¡baseUrl incorrecto!
 ```
 
-Create separate configs and executors for different APIs.
+Crea configs y executors separados para diferentes APIs.
 
 ---
 
-*For more details, see the module-level READMEs in `network-core/`, `network-ktor/`, `security-core/`, and `sample-api/`.*
+*Para más detalles, consulta los READMEs de cada módulo en `network-core/`, `network-ktor/`, `security-core/` y `sample-api/`.*

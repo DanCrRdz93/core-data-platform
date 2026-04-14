@@ -1,20 +1,20 @@
-# Architecture Diagrams
+# Diagramas de Arquitectura
 
-Visual documentation for the Core Data Platform SDK. All diagrams are rendered as **SVG images** committed to the repository, with Mermaid source files available for editing.
+Documentación visual del SDK Core Data Platform. Todos los diagramas están renderizados como **imágenes SVG** committeadas al repositorio, con archivos fuente Mermaid disponibles para edición.
 
-## Index
+## Índice
 
-| Document | Diagrams | Description |
+| Documento | Diagramas | Descripción |
 |---|---|---|
-| [01-general-architecture](01-general-architecture.md) | System overview | How the SDK fits within consuming applications — layers, modules, and boundaries |
-| [02-module-dependencies](02-module-dependencies.md) | Dependency graph | All modules and external libraries with their dependency relationships |
-| [03-request-execution-flow](03-request-execution-flow.md) | Sequence diagram | Complete lifecycle of a request: prepare → intercept → transport → validate → deserialize → retry |
-| [04-kmp-strategy](04-kmp-strategy.md) | Source set distribution + decision flowchart | What goes in `commonMain` vs `androidMain` vs `iosMain` |
-| [05-contract-relationships](05-contract-relationships.md) | 4 class diagrams | Execution pipeline, result/error model, security contracts, and cross-module integration |
+| [01-general-architecture](01-general-architecture.md) | Vista general del sistema | Cómo el SDK encaja dentro de las aplicaciones consumidoras — capas, módulos y límites |
+| [02-module-dependencies](02-module-dependencies.md) | Grafo de dependencias | Todos los módulos y librerías externas con sus relaciones de dependencia |
+| [03-request-execution-flow](03-request-execution-flow.md) | Diagrama de secuencia | Ciclo de vida completo de una request: preparar → interceptar → transportar → validar → deserializar → reintentar |
+| [04-kmp-strategy](04-kmp-strategy.md) | Distribución de source sets + flowchart de decisión | Qué va en `commonMain` vs `androidMain` vs `iosMain` |
+| [05-contract-relationships](05-contract-relationships.md) | 4 diagramas de clases | Pipeline de ejecución, modelo de resultado/error, contratos de seguridad e integración cross-module |
 
-## Generated Images
+## Imágenes Generadas
 
-All SVG files in `images/` are generated from the `.mmd` source files in `mmd/`:
+Todos los archivos SVG en `images/` se generan a partir de los archivos fuente `.mmd` en `mmd/`:
 
 | Image | Source |
 |---|---|
@@ -29,24 +29,24 @@ All SVG files in `images/` are generated from the `.mmd` source files in `mmd/`:
 | `images/06-cross-module-integration.svg` | `mmd/06-cross-module-integration.mmd` |
 | `images/05-contract-relationships.svg` | `mmd/05-contract-relationships.mmd` |
 
-## Regenerating Diagrams
+## Regenerar Diagramas
 
-If you edit a `.mmd` source file, regenerate the corresponding SVG:
+Si editas un archivo fuente `.mmd`, regenera el SVG correspondiente:
 
 ```bash
-# Single diagram
+# Un solo diagrama
 mmdc -i docs/diagrams/mmd/01-general-architecture.mmd \
      -o docs/diagrams/images/01-general-architecture.svg \
      -b transparent
 
-# All diagrams
+# Todos los diagramas
 for f in docs/diagrams/mmd/*.mmd; do
   name=$(basename "$f" .mmd)
   mmdc -i "$f" -o "docs/diagrams/images/${name}.svg" -b transparent
 done
 ```
 
-Requires `@mermaid-js/mermaid-cli`:
+Requiere `@mermaid-js/mermaid-cli`:
 
 ```bash
 npm install -g @mermaid-js/mermaid-cli

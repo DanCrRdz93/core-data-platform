@@ -1,13 +1,13 @@
-# Principal Contract Relationships
+# Relaciones Principales de Contratos
 
-How the main interfaces, sealed classes, and implementations relate to each other across the SDK.
+Cómo las interfaces principales, sealed classes e implementaciones se relacionan entre sí a través del SDK.
 
-## Execution Pipeline Contracts
+## Contratos del Pipeline de Ejecución
 
 ![Execution Pipeline Contracts](images/05a-execution-pipeline.svg)
 
 <details>
-<summary>Mermaid source</summary>
+<summary>Código fuente Mermaid</summary>
 
 ```mermaid
 classDiagram
@@ -101,12 +101,12 @@ classDiagram
 
 </details>
 
-## Result and Error Model
+## Modelo de Resultado y Error
 
 ![Result and Error Model](images/05b-result-error-model.svg)
 
 <details>
-<summary>Mermaid source</summary>
+<summary>Código fuente Mermaid</summary>
 
 ```mermaid
 classDiagram
@@ -185,12 +185,12 @@ classDiagram
 
 </details>
 
-## Security Contracts
+## Contratos de Seguridad
 
 ![Security Contracts](images/05c-security-contracts.svg)
 
 <details>
-<summary>Mermaid source</summary>
+<summary>Código fuente Mermaid</summary>
 
 ```mermaid
 classDiagram
@@ -275,12 +275,12 @@ classDiagram
 
 </details>
 
-## Cross-Module Integration
+## Integración Cross-Module
 
 ![Cross-Module Integration](images/06-cross-module-integration.svg)
 
 <details>
-<summary>Mermaid source</summary>
+<summary>Código fuente Mermaid</summary>
 
 ```mermaid
 graph LR
@@ -298,7 +298,7 @@ graph LR
         RI -->|"modifies"| HR
     end
 
-    subgraph consumer["Domain Module"]
+    subgraph consumer["Módulo de Dominio"]
         AI["Auth Interceptor"]
         AI -->|"calls"| CP
         AI -->|"calls"| CHM
@@ -314,4 +314,4 @@ graph LR
 
 </details>
 
-The domain module is the **only place** where `security-core` and `network-core` types meet. The bridge is a `RequestInterceptor` that calls `CredentialProvider.current()`, passes the result through `CredentialHeaderMapper.toHeaders()`, and merges the headers into the `HttpRequest`.
+El módulo de dominio es el **único lugar** donde los tipos de `security-core` y `network-core` se encuentran. El puente es un `RequestInterceptor` que llama a `CredentialProvider.current()`, pasa el resultado por `CredentialHeaderMapper.toHeaders()`, y combina los headers en el `HttpRequest`.

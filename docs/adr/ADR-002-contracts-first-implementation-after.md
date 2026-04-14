@@ -1,30 +1,30 @@
-# ADR-002: Contracts First, Implementation After
+# ADR-002: Contratos primero, implementación después
 
-## Status
+## Estado
 
-**Accepted**
+**Aceptado**
 
-## Context
+## Contexto
 
-When building a shared SDK consumed by multiple applications, the stability of the public API is critical. If consumers depend on concrete classes, any internal refactoring (changing an HTTP library, restructuring retry logic, modifying storage backends) risks breaking all downstream apps.
+Al construir un SDK compartido consumido por múltiples aplicaciones, la estabilidad del API público es crítica. Si los consumidores dependen de clases concretas, cualquier refactorización interna (cambiar una librería HTTP, reestructurar lógica de reintentos, modificar backends de almacenamiento) arriesga romper todas las apps downstream.
 
-Two approaches were considered:
+Se consideraron dos enfoques:
 
-1. **Implementation-first:** Build concrete classes (e.g., `KtorRequestExecutor`) and extract interfaces later if needed.
-2. **Contracts-first:** Define interfaces and sealed types first. Build implementations behind them. Consumers code to the contract, never to the concrete class.
+1. **Implementación primero:** Construir clases concretas (ej. `KtorRequestExecutor`) y extraer interfaces después si se necesitan.
+2. **Contratos primero:** Definir interfaces y tipos sealed primero. Construir implementaciones detrás de ellos. Los consumidores programan contra el contrato, nunca contra la clase concreta.
 
-## Decision
+## Decisión
 
-All major components are defined as **interfaces, sealed classes, or abstract classes** before any implementation is written. Consumers depend on these contracts exclusively.
+Todos los componentes principales se definen como **interfaces, sealed classes o clases abstractas** antes de escribir cualquier implementación. Los consumidores dependen exclusivamente de estos contratos.
 
-Concrete implementations are:
-- Named with a `Default` prefix (`DefaultSafeRequestExecutor`, `DefaultErrorClassifier`, `DefaultResponseValidator`, `DefaultLogSanitizer`, `DefaultTrustPolicy`) to signal they are replaceable defaults.
-- Declared as `open class` where extension is expected (e.g., `DefaultErrorClassifier`), enabling platform-specific subclasses without reimplementing the entire contract.
-- Injected via constructor parameters, never instantiated internally by other components.
+Las implementaciones concretas:
+- Se nombran con prefijo `Default` (`DefaultSafeRequestExecutor`, `DefaultErrorClassifier`, `DefaultResponseValidator`, `DefaultLogSanitizer`, `DefaultTrustPolicy`) para señalar que son defaults reemplazables.
+- Se declaran como `open class` donde se espera extensión (ej. `DefaultErrorClassifier`), habilitando subclases específicas de plataforma sin reimplementar el contrato completo.
+- Se inyectan vía parámetros del constructor, nunca se instancian internamente por otros componentes.
 
-### Contract inventory
+### Inventario de contratos
 
-| Contract (interface / sealed / abstract) | Default Implementation | Module |
+| Contrato (interface / sealed / abstract) | Implementación por defecto | Módulo |
 |---|---|---|
 | `HttpEngine` | `KtorHttpEngine` | `network-core` / `network-ktor` |
 | `SafeRequestExecutor` | `DefaultSafeRequestExecutor` | `network-core` |
@@ -45,17 +45,17 @@ Concrete implementations are:
 | `Credential` (sealed interface) | — | `security-core` |
 | `SecurityError` (sealed class) | — | `security-core` |
 
-## Consequences
+## Consecuencias
 
-### Positive
+### Positivas
 
-- **Stable public API.** Consumers code to `SafeRequestExecutor`, not `DefaultSafeRequestExecutor`. Internal refactoring (e.g., changing the retry algorithm) does not break any consumer.
-- **Testability.** Every dependency is mockable. Testing a `UserRemoteDataSource` requires only a mock `SafeRequestExecutor` — no HTTP server, no Ktor, no coroutine complexity.
-- **Pluggability.** Replacing Ktor with OkHttp means implementing `HttpEngine` in a new module. Zero changes to `network-core`, `security-core`, or any domain module.
-- **Gradual implementation.** Contracts can be designed and reviewed before writing any implementation. `SessionController` is a defined interface today; its implementation can follow when `SecretStore` is ready.
+- **API público estable.** Los consumidores programan contra `SafeRequestExecutor`, no `DefaultSafeRequestExecutor`. Refactorización interna (ej. cambiar el algoritmo de reintentos) no rompe ningún consumidor.
+- **Testabilidad.** Cada dependencia es mockeable. Testear un `UserRemoteDataSource` requiere solo un mock de `SafeRequestExecutor` — sin servidor HTTP, sin Ktor, sin complejidad de coroutines.
+- **Reemplazabilidad.** Reemplazar Ktor con OkHttp significa implementar `HttpEngine` en un nuevo módulo. Cero cambios en `network-core`, `security-core`, o cualquier módulo de dominio.
+- **Implementación gradual.** Los contratos pueden diseñarse y revisarse antes de escribir cualquier implementación. `SessionController` es una interfaz definida hoy; su implementación puede seguir cuando `SecretStore` esté listo.
 
-### Negative
+### Negativas
 
-- **More files.** Each major component has at least two files: the contract and the default implementation. This is accepted as the cost of maintainability at scale.
-- **Indirection.** Developers must navigate from interface to implementation when debugging. Mitigated by consistent `Default*` naming and clear package structure.
-- **Sealed types require source modification to extend.** Adding a new `NetworkError` subtype or `RetryPolicy` variant requires modifying the sealed class file. This is intentional — it forces all consumers to handle new cases at compile time.
+- **Más archivos.** Cada componente principal tiene al menos dos archivos: el contrato y la implementación por defecto. Esto se acepta como el costo de la mantenibilidad a escala.
+- **Indirección.** Los desarrolladores deben navegar de la interfaz a la implementación al depurar. Se mitiga con el naming consistente `Default*` y estructura de paquetes clara.
+- **Los tipos sealed requieren modificación del fuente para extenderse.** Agregar un nuevo subtipo de `NetworkError` o variante de `RetryPolicy` requiere modificar el archivo de la sealed class. Esto es intencional — fuerza a todos los consumidores a manejar nuevos casos en tiempo de compilación.

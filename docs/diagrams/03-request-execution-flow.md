@@ -1,13 +1,13 @@
-# Request Execution Flow
+# Flujo de Ejecución de Requests
 
-Complete lifecycle of a network request, from the consumer calling a repository method to receiving a `NetworkResult<T>` with clean domain models.
+Ciclo de vida completo de una request de red, desde el consumidor llamando un método del repository hasta recibir un `NetworkResult<T>` con modelos de dominio limpios.
 
-## Sequence Diagram
+## Diagrama de Secuencia
 
 ![Request Execution Flow](images/03-request-execution-flow.svg)
 
 <details>
-<summary>Mermaid source</summary>
+<summary>Código fuente Mermaid</summary>
 
 ```mermaid
 sequenceDiagram
@@ -81,15 +81,15 @@ sequenceDiagram
 
 </details>
 
-## Pipeline Stages Summary
+## Resumen de Etapas del Pipeline
 
-| Stage | Component | Responsibility |
+| Etapa | Componente | Responsabilidad |
 |---|---|---|
-| ① Prepare | `DefaultSafeRequestExecutor` | Merge headers, build URL, run `RequestInterceptor` chain |
-| ② Observe | `NetworkEventObserver` | `onRequestStarted` — metrics, tracing |
-| ③ Transport | `HttpEngine` | Send HTTP request, receive raw response |
-| ④ Post-process | `ResponseInterceptor` | Logging, caching, header extraction |
-| ⑤ Validate | `ResponseValidator` | 2xx = valid, non-2xx = classify as error |
-| ⑥ Deserialize | Consumer-provided lambda | `(RawResponse) -> T` |
-| ⑦ Retry | `RetryPolicy` + `error.isRetryable` | Delay and retry if applicable |
-| ⑧ Return | `NetworkResult<T>` | `Success(data, metadata)` or `Failure(error)` |
+| ① Preparar | `DefaultSafeRequestExecutor` | Combinar headers, construir URL, ejecutar cadena de `RequestInterceptor` |
+| ② Observar | `NetworkEventObserver` | `onRequestStarted` — métricas, trazabilidad |
+| ③ Transportar | `HttpEngine` | Enviar request HTTP, recibir respuesta cruda |
+| ④ Post-procesar | `ResponseInterceptor` | Logging, caching, extracción de headers |
+| ⑤ Validar | `ResponseValidator` | 2xx = válido, no-2xx = clasificar como error |
+| ⑥ Deserializar | Lambda provisto por consumidor | `(RawResponse) -> T` |
+| ⑦ Reintentar | `RetryPolicy` + `error.isRetryable` | Delay y reintento si aplica |
+| ⑧ Retornar | `NetworkResult<T>` | `Success(data, metadata)` o `Failure(error)` |

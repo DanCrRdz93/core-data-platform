@@ -1,40 +1,40 @@
-# ADR-005: Centralized Safe Execution Pipeline
+# ADR-005: Pipeline de ejecución segura centralizado
 
-## Status
+## Estado
 
-**Accepted**
+**Aceptado**
 
-## Context
+## Contexto
 
-In a multi-app SDK, every network request must go through a consistent pipeline that ensures:
+En un SDK multi-app, cada request de red debe pasar por un pipeline consistente que asegure:
 
-- Default headers are applied.
-- Authentication credentials are injected.
-- Retry policies are respected.
-- Responses are validated before deserialization.
-- Errors are classified into semantic types.
-- Observers are notified for metrics and tracing.
-- Coroutine cancellation is propagated correctly.
-- Exceptions never escape unclassified.
+- Se aplican headers por defecto.
+- Se inyectan credenciales de autenticación.
+- Se respetan las políticas de reintento.
+- Se validan las respuestas antes de la deserialización.
+- Se clasifican los errores en tipos semánticos.
+- Se notifica a los observers para métricas y trazabilidad.
+- Se propaga correctamente la cancelación de coroutines.
+- Las excepciones nunca escapan sin clasificar.
 
-Without centralization, each data source or repository would reimplement parts of this logic, leading to:
+Sin centralización, cada data source o repository reimplementaría partes de esta lógica, llevando a:
 
-- Inconsistent error handling across endpoints.
-- Duplicated retry logic with subtle behavioral differences.
-- Auth headers applied in some requests but forgotten in others.
-- No single point to add observability.
-- Testing that requires verifying the same pipeline in every data source.
+- Manejo de errores inconsistente entre endpoints.
+- Lógica de reintentos duplicada con diferencias sutiles de comportamiento.
+- Headers de auth aplicados en algunas requests pero olvidados en otras.
+- Ningún punto único para agregar observabilidad.
+- Testing que requiere verificar el mismo pipeline en cada data source.
 
-Two approaches were considered:
+Se consideraron dos enfoques:
 
-1. **Decentralized.** Each `RemoteDataSource` handles its own retry, validation, and error mapping.
-2. **Centralized.** A single `SafeRequestExecutor` orchestrates the full lifecycle. Data sources only provide the `HttpRequest` and a `deserialize` function.
+1. **Descentralizado.** Cada `RemoteDataSource` maneja su propio reintento, validación y mapeo de errores.
+2. **Centralizado.** Un único `SafeRequestExecutor` orquesta el ciclo de vida completo. Los data sources solo proveen el `HttpRequest` y una función `deserialize`.
 
-## Decision
+## Decisión
 
-All network operations flow through `DefaultSafeRequestExecutor`, which implements the `SafeRequestExecutor` interface. Data sources extend `RemoteDataSource`, which delegates to the executor. No data source ever calls `HttpEngine.execute()` directly.
+Todas las operaciones de red fluyen a través de `DefaultSafeRequestExecutor`, que implementa la interfaz `SafeRequestExecutor`. Los data sources extienden `RemoteDataSource`, que delega al executor. Ningún data source llama a `HttpEngine.execute()` directamente.
 
-### Pipeline stages (in order)
+### Etapas del pipeline (en orden)
 
 ```
 1. PREPARE
@@ -73,7 +73,7 @@ All network operations flow through `DefaultSafeRequestExecutor`, which implemen
    └── NetworkResult.Success(data, metadata) | NetworkResult.Failure(error)
 ```
 
-### Constructor parameters
+### Parámetros del constructor
 
 ```kotlin
 class DefaultSafeRequestExecutor(
@@ -87,24 +87,24 @@ class DefaultSafeRequestExecutor(
 )
 ```
 
-All parameters except `engine` and `config` have sensible defaults. A minimal setup requires only two arguments.
+Todos los parámetros excepto `engine` y `config` tienen valores por defecto razonables. Una configuración mínima requiere solo dos argumentos.
 
-### Critical invariant
+### Invariante crítica
 
-`CancellationException` is **always rethrown**, never caught, never classified. The executor respects structured concurrency unconditionally. Every `try`/`catch` block in the pipeline explicitly checks for `CancellationException` first.
+`CancellationException` se **siempre relanza**, nunca se captura, nunca se clasifica. El executor respeta la concurrencia estructurada incondicionalmente. Cada bloque `try`/`catch` en el pipeline verifica explícitamente `CancellationException` primero.
 
-## Consequences
+## Consecuencias
 
-### Positive
+### Positivas
 
-- **Consistency.** Every request — regardless of domain module, endpoint, or team — passes through the same preparation, validation, classification, retry, and observability stages.
-- **Single point of extension.** Adding metrics requires passing a `NetworkEventObserver` to the executor. Adding auth requires adding a `RequestInterceptor`. No data source changes needed.
-- **Data sources are trivial.** A typical data source is 15–25 lines: build an `HttpRequest`, provide a `deserialize` lambda, call `execute()`. All complexity is in the executor.
-- **Retry is transparent.** `ResponseMetadata.attemptCount` tells the consumer how many attempts were needed, without the consumer implementing any retry logic.
-- **Testability.** Testing a data source requires mocking only `SafeRequestExecutor` — return a `NetworkResult.Success` or `NetworkResult.Failure`. No HTTP server, no coroutine delay, no retry simulation.
+- **Consistencia.** Cada request — independientemente del módulo de dominio, endpoint o equipo — pasa por las mismas etapas de preparación, validación, clasificación, reintento y observabilidad.
+- **Punto único de extensión.** Agregar métricas requiere pasar un `NetworkEventObserver` al executor. Agregar auth requiere agregar un `RequestInterceptor`. Sin cambios en data sources.
+- **Los data sources son triviales.** Un data source típico tiene 15–25 líneas: construir un `HttpRequest`, proveer un lambda `deserialize`, llamar `execute()`. Toda la complejidad está en el executor.
+- **El reintento es transparente.** `ResponseMetadata.attemptCount` dice al consumidor cuántos intentos fueron necesarios, sin que el consumidor implemente ninguna lógica de reintento.
+- **Testabilidad.** Testear un data source requiere mockear solo `SafeRequestExecutor` — retornar un `NetworkResult.Success` o `NetworkResult.Failure`. Sin servidor HTTP, sin delay de coroutines, sin simulación de reintentos.
 
-### Negative
+### Negativas
 
-- **Single point of failure.** A bug in `DefaultSafeRequestExecutor` affects all requests in all apps. Mitigated by thorough testing (pending) and the `open` nature of `DefaultErrorClassifier` / `DefaultResponseValidator`.
-- **No per-request pipeline customization.** All requests share the same interceptor chain and observer list. Per-request behavior is limited to `RequestContext` (operation ID, retry policy override, auth flag). A future enhancement could allow per-request interceptor overrides if needed.
-- **Ordering sensitivity.** `RequestInterceptor` and `ResponseInterceptor` lists are ordered. The auth interceptor must run before a logging interceptor that logs final headers. This ordering is implicit — there is no priority mechanism.
+- **Punto único de fallo.** Un bug en `DefaultSafeRequestExecutor` afecta todas las requests en todas las apps. Se mitiga con testing exhaustivo (pendiente) y la naturaleza `open` de `DefaultErrorClassifier` / `DefaultResponseValidator`.
+- **Sin personalización de pipeline por request.** Todas las requests comparten la misma cadena de interceptors y lista de observers. El comportamiento por request se limita a `RequestContext` (operation ID, override de política de reintento, flag de auth). Una mejora futura podría permitir overrides de interceptors por request si se necesita.
+- **Sensibilidad al orden.** Las listas de `RequestInterceptor` y `ResponseInterceptor` están ordenadas. El interceptor de auth debe ejecutarse antes de un interceptor de logging que registre los headers finales. Este orden es implícito — no hay mecanismo de prioridad.

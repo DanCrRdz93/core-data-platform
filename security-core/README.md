@@ -1,39 +1,39 @@
 # :security-core
 
-**Security Abstractions for Kotlin Multiplatform**
+**Abstracciones de Seguridad para Kotlin Multiplatform**
 
-This module defines the complete contract surface for credential management, session lifecycle, secure storage, TLS trust evaluation, and log sanitization — all as platform-agnostic abstractions with platform-specific implementations at the edges.
-
----
-
-## Purpose
-
-`:security-core` answers one question:
-
-> *"How do I manage credentials, sessions, secrets, and trust policies across Android and iOS — without coupling any business logic to platform-specific security APIs?"*
-
-This module has **zero dependency on `:network-core`**. It knows nothing about HTTP, Ktor, or request execution. The integration point between networking and security is `CredentialHeaderMapper`, which converts a `Credential` into a plain `Map<String, String>` — no network types involved.
+Este módulo define la superficie completa de contratos para gestión de credenciales, ciclo de vida de sesiones, almacenamiento seguro, evaluación de confianza TLS y sanitización de logs — todo como abstracciones agnósticas de plataforma con implementaciones específicas de plataforma en los bordes.
 
 ---
 
-## Responsibilities
+## Propósito
 
-| Responsibility | Owner |
+`:security-core` responde una pregunta:
+
+> *"¿Cómo gestiono credenciales, sesiones, secretos y políticas de confianza a través de Android e iOS — sin acoplar ninguna lógica de negocio a APIs de seguridad específicas de plataforma?"*
+
+Este módulo tiene **cero dependencia en `:network-core`**. No sabe nada de HTTP, Ktor ni ejecución de requests. El punto de integración entre networking y seguridad es `CredentialHeaderMapper`, que convierte un `Credential` en un simple `Map<String, String>` — sin tipos de red involucrados.
+
+---
+
+## Responsabilidades
+
+| Responsabilidad | Dueño |
 |---|---|
-| Model authentication credentials | `Credential` (sealed interface) |
-| Supply the active credential for requests | `CredentialProvider` |
-| Convert credentials to HTTP-safe headers | `CredentialHeaderMapper` |
-| Manage session lifecycle reactively | `SessionController`, `SessionState`, `SessionEvent` |
-| Store secrets securely per platform | `SecretStore`, `AndroidSecretStore`, `IosSecretStore` |
-| Evaluate host trust and certificate pinning | `TrustPolicy`, `TrustEvaluation`, `CertificatePin` |
-| Redact sensitive data in logs | `LogSanitizer`, `DefaultLogSanitizer` |
-| Configure security policies | `SecurityConfig` |
-| Model security errors semantically | `SecurityError`, `Diagnostic` |
-| Provide cross-platform Base64 encoding | `Base64` utility |
+| Modelar credenciales de autenticación | `Credential` (sealed interface) |
+| Proveer la credencial activa para requests | `CredentialProvider` |
+| Convertir credenciales a headers HTTP seguros | `CredentialHeaderMapper` |
+| Gestionar el ciclo de vida de sesión reactivamente | `SessionController`, `SessionState`, `SessionEvent` |
+| Almacenar secretos de forma segura por plataforma | `SecretStore`, `AndroidSecretStore`, `IosSecretStore` |
+| Evaluar confianza de host y certificate pinning | `TrustPolicy`, `TrustEvaluation`, `CertificatePin` |
+| Redactar datos sensibles en logs | `LogSanitizer`, `DefaultLogSanitizer` |
+| Configurar políticas de seguridad | `SecurityConfig` |
+| Modelar errores de seguridad semánticamente | `SecurityError`, `Diagnostic` |
+| Proveer codificación Base64 cross-platform | Utilidad `Base64` |
 
 ---
 
-## Principal Contracts
+## Contratos Principales
 
 ### Credential
 
@@ -46,7 +46,7 @@ sealed interface Credential {
 }
 ```
 
-Exhaustive sealed interface — all credential types are known at compile time. `Custom` is the escape hatch for proprietary auth schemes.
+Sealed interface exhaustiva — todos los tipos de credenciales son conocidos en tiempo de compilación. `Custom` es la vía de escape para esquemas de auth propietarios.
 
 ### CredentialProvider
 
@@ -56,9 +56,9 @@ interface CredentialProvider {
 }
 ```
 
-Returns the currently active credential, or `null` if unauthenticated. Implementations should read from `SessionController` or `SecretStore` — never cache stale tokens.
+Retorna la credencial activa actualmente, o `null` si no está autenticado. Las implementaciones deben leer de `SessionController` o `SecretStore` — nunca cachear tokens obsoletos.
 
-> **Status:** Interface defined. Concrete implementation pending (depends on `SessionController` and `SecretStore` implementations).
+> **Estado:** Interfaz definida. Implementación concreta pendiente (depende de las implementaciones de `SessionController` y `SecretStore`).
 
 ### CredentialHeaderMapper
 
@@ -68,7 +68,7 @@ object CredentialHeaderMapper {
 }
 ```
 
-Pure, stateless conversion — no network-core dependency:
+Conversión pura y sin estado — sin dependencia de network-core:
 
 | Credential Type | Output |
 |---|---|
@@ -77,7 +77,7 @@ Pure, stateless conversion — no network-core dependency:
 | `Basic("user", "pass")` | `{"Authorization": "Basic dXNlcjpwYXNz"}` |
 | `Custom("OAuth2", props)` | `props` as-is |
 
-Uses `Base64.encodeToString()` from the `util/` package for Basic auth encoding.
+Usa `Base64.encodeToString()` del paquete `util/` para codificación de auth Basic.
 
 ### SessionController
 
@@ -91,7 +91,7 @@ interface SessionController {
 }
 ```
 
-`SessionState` is a sealed interface:
+`SessionState` es una sealed interface:
 
 ```kotlin
 sealed interface SessionState {
@@ -101,7 +101,7 @@ sealed interface SessionState {
 }
 ```
 
-`SessionEvent` captures lifecycle transitions:
+`SessionEvent` captura transiciones del ciclo de vida:
 
 ```kotlin
 sealed class SessionEvent {
@@ -113,7 +113,7 @@ sealed class SessionEvent {
 }
 ```
 
-> **Status:** Interface defined with `StateFlow` for reactive UI observation. Implementation pending.
+> **Estado:** Interfaz definida con `StateFlow` para observación reactiva de UI. Implementación pendiente.
 
 ### SecretStore
 
@@ -129,7 +129,7 @@ interface SecretStore {
 }
 ```
 
-All operations are `suspend` — platform storage APIs may involve I/O.
+Todas las operaciones son `suspend` — las APIs de almacenamiento de plataforma pueden involucrar I/O.
 
 ### TrustPolicy
 
@@ -149,7 +149,7 @@ sealed interface TrustEvaluation {
 data class CertificatePin(val algorithm: String, val hash: String)
 ```
 
-`DefaultTrustPolicy` trusts all hosts (development default). Production apps override with pin sets per hostname.
+`DefaultTrustPolicy` confía en todos los hosts (default de desarrollo). Las apps de producción sobreescriben con conjuntos de pines por hostname.
 
 ### LogSanitizer
 
@@ -159,9 +159,9 @@ interface LogSanitizer {
 }
 ```
 
-`DefaultLogSanitizer` uses `SecurityConfig` to identify sensitive keys and replaces their values with `"██"`.
+`DefaultLogSanitizer` usa `SecurityConfig` para identificar claves sensibles y reemplaza sus valores con `"██"`.
 
-Extension functions for bulk sanitization:
+Funciones de extensión para sanitización en lote:
 
 ```kotlin
 fun LogSanitizer.sanitizeHeaders(headers: Map<String, String>): Map<String, String>
@@ -186,52 +186,52 @@ sealed class SecurityError {
 
 ---
 
-## Internal Structure
+## Estructura Interna
 
 ```
 security-core/src/
 ├── commonMain/kotlin/com/dancr/platform/security/
 │   ├── config/
-│   │   └── SecurityConfig.kt              # Sensitive headers/keys, redaction placeholder
+│   │   └── SecurityConfig.kt              # Headers/claves sensibles, placeholder de redacción
 │   ├── credential/
 │   │   ├── Credential.kt                  # Sealed interface: Bearer, ApiKey, Basic, Custom
-│   │   ├── CredentialProvider.kt          # Interface — supplies active credential
+│   │   ├── CredentialProvider.kt          # Interfaz — provee credencial activa
 │   │   └── CredentialHeaderMapper.kt      # Credential → Map<String, String>
 │   ├── error/
-│   │   ├── SecurityError.kt               # Semantic error taxonomy (sealed class)
-│   │   └── Diagnostic.kt                  # Internal error details
+│   │   ├── SecurityError.kt               # Taxonomía de errores semánticos (sealed class)
+│   │   └── Diagnostic.kt                  # Detalles internos de error
 │   ├── sanitizer/
-│   │   ├── LogSanitizer.kt                # Interface + extension functions
-│   │   └── DefaultLogSanitizer.kt         # Config-driven key redaction
+│   │   ├── LogSanitizer.kt                # Interfaz + funciones de extensión
+│   │   └── DefaultLogSanitizer.kt         # Redacción de claves basada en configuración
 │   ├── session/
-│   │   ├── SessionController.kt           # Session lifecycle contract (StateFlow-based)
+│   │   ├── SessionController.kt           # Contrato de ciclo de vida de sesión (basado en StateFlow)
 │   │   ├── SessionState.kt                # Idle | Active(credential) | Expired
 │   │   ├── SessionCredentials.kt          # Credential + refreshToken + expiresAtMs
 │   │   └── SessionEvent.kt                # Started, Refreshed, Expired, Ended, RefreshFailed
 │   ├── store/
-│   │   └── SecretStore.kt                 # Secure key-value storage interface
+│   │   └── SecretStore.kt                 # Interfaz de almacenamiento seguro clave-valor
 │   ├── trust/
-│   │   ├── TrustPolicy.kt                # Host evaluation + cert pinning interface
+│   │   ├── TrustPolicy.kt                # Interfaz de evaluación de host + cert pinning
 │   │   ├── TrustEvaluation.kt            # Trusted | Denied(reason)
-│   │   ├── CertificatePin.kt             # Algorithm + hash pair
-│   │   └── DefaultTrustPolicy.kt         # Always-trust default
+│   │   ├── CertificatePin.kt             # Par algoritmo + hash
+│   │   └── DefaultTrustPolicy.kt         # Default que confía en todo
 │   └── util/
-│       └── Base64.kt                      # Cross-platform Base64 encoding
+│       └── Base64.kt                      # Codificación Base64 cross-platform
 │
 ├── androidMain/kotlin/com/dancr/platform/security/store/
-│   ├── AndroidSecretStore.kt              # SecretStore impl (skeleton)
-│   └── AndroidStoreConfig.kt             # Preferences name, master key alias, key prefix
+│   ├── AndroidSecretStore.kt              # Impl de SecretStore (skeleton)
+│   └── AndroidStoreConfig.kt             # Nombre de preferences, alias de master key, prefijo de clave
 │
 └── iosMain/kotlin/com/dancr/platform/security/store/
-    ├── IosSecretStore.kt                  # SecretStore impl (skeleton)
-    └── KeychainConfig.kt                  # Service name, access group, accessibility level
+    ├── IosSecretStore.kt                  # Impl de SecretStore (skeleton)
+    └── KeychainConfig.kt                  # Nombre de servicio, grupo de acceso, nivel de accesibilidad
 ```
 
 ---
 
-## Architecture
+## Arquitectura
 
-### Separation by Concern
+### Separación por Preocupación
 
 ```mermaid
 graph TD
@@ -284,7 +284,7 @@ graph TD
     style LS fill:#f3e5f5,stroke:#7b1fa2
 ```
 
-### Platform Source Set Distribution
+### Distribución de Source Sets de Plataforma
 
 ```mermaid
 graph LR
@@ -318,9 +318,9 @@ graph LR
 
 ---
 
-## Usage Examples
+## Ejemplos de Uso
 
-### Using CredentialHeaderMapper (no network dependency)
+### Usando CredentialHeaderMapper (sin dependencia de red)
 
 ```kotlin
 val credential = Credential.Bearer("eyJhbGciOiJIUzI1NiIs...")
@@ -328,10 +328,10 @@ val headers = CredentialHeaderMapper.toHeaders(credential)
 // {"Authorization": "Bearer eyJhbGciOiJIUzI1NiIs..."}
 ```
 
-### Building an auth interceptor (in consuming module)
+### Construir un interceptor de auth (en módulo consumidor)
 
 ```kotlin
-// This code lives in the domain module, NOT in security-core
+// Este código vive en el módulo de dominio, NO en security-core
 val authInterceptor = RequestInterceptor { request, _ ->
     val credential = credentialProvider.current()
         ?: return@RequestInterceptor request
@@ -340,10 +340,10 @@ val authInterceptor = RequestInterceptor { request, _ ->
 }
 ```
 
-### Observing session state (in UI layer)
+### Observar estado de sesión (en capa de UI)
 
 ```kotlin
-// In a ViewModel
+// En un ViewModel
 sessionController.state.collect { state ->
     when (state) {
         is SessionState.Idle -> showLoginScreen()
@@ -353,7 +353,7 @@ sessionController.state.collect { state ->
 }
 ```
 
-### Sanitizing logs
+### Sanitizar logs
 
 ```kotlin
 val sanitizer = DefaultLogSanitizer()
@@ -362,7 +362,7 @@ val safe = sanitizer.sanitizeHeaders(rawHeaders)
 // {"Authorization": "██", "Accept": "application/json"}
 ```
 
-### Configuring sensitive keys
+### Configurar claves sensibles
 
 ```kotlin
 val config = SecurityConfig(
@@ -373,7 +373,7 @@ val config = SecurityConfig(
 val sanitizer = DefaultLogSanitizer(config)
 ```
 
-### Trust evaluation
+### Evaluación de confianza
 
 ```kotlin
 class ProductionTrustPolicy : TrustPolicy {
@@ -393,99 +393,99 @@ class ProductionTrustPolicy : TrustPolicy {
 
 ---
 
-## Design Decisions
+## Decisiones de Diseño
 
-| Decision | Rationale |
+| Decisión | Razón |
 |---|---|
-| **Zero dependency on `:network-core`** | Security concerns (credentials, storage, trust) are fundamentally independent of HTTP transport. A module that only needs secure storage should not pull in the entire networking stack. |
-| **`CredentialHeaderMapper` returns `Map<String, String>`** | The mapper converts credentials to plain header pairs without importing `HttpRequest`, `RequestInterceptor`, or any network type. This keeps the boundary clean. |
-| **`SessionController.state` is `StateFlow`** | Enables reactive UI observation. A `val state: SessionState` property would require polling. `StateFlow` gives subscribers immediate access to the current value and reactive updates. |
-| **`Credential` is a sealed interface** | Compile-time exhaustive matching via `when`. All credential types are known, which prevents runtime surprises. `Custom` is the escape hatch for proprietary schemes. |
-| **Platform implementations are skeletons with TODOs** | The interface and architecture are proven. The platform implementations require careful integration with Android Keystore and iOS Keychain APIs, which are high-risk code that should be implemented with proper testing infrastructure. |
-| **`SecurityError` mirrors `NetworkError` structure** | Both use sealed classes with `message` (user-safe) + `diagnostic` (internal). This parallel structure simplifies error handling in consumers that bridge both modules. |
-| **`Base64` is a manual implementation** | Kotlin common stdlib does not provide Base64 encoding. The manual implementation avoids a dependency on `kotlinx-io` or platform-specific APIs for a trivial utility. |
-| **`DefaultLogSanitizer` uses key matching, not pattern matching** | Simple, predictable, and fast. If a key is in the sensitive set, its value is fully redacted. No regex, no partial redaction, no false negatives. |
+| **Cero dependencia en `:network-core`** | Las preocupaciones de seguridad (credenciales, almacenamiento, confianza) son fundamentalmente independientes del transporte HTTP. Un módulo que solo necesita almacenamiento seguro no debería traer todo el stack de networking. |
+| **`CredentialHeaderMapper` retorna `Map<String, String>`** | El mapper convierte credenciales a pares de headers simples sin importar `HttpRequest`, `RequestInterceptor`, ni ningún tipo de red. Esto mantiene el límite limpio. |
+| **`SessionController.state` es `StateFlow`** | Habilita observación reactiva de UI. Una propiedad `val state: SessionState` requeriría polling. `StateFlow` da a los suscriptores acceso inmediato al valor actual y actualizaciones reactivas. |
+| **`Credential` es una sealed interface** | Matching exhaustivo en tiempo de compilación vía `when`. Todos los tipos de credenciales son conocidos, lo que previene sorpresas en runtime. `Custom` es la vía de escape para esquemas propietarios. |
+| **Las implementaciones de plataforma son skeletons con TODOs** | La interfaz y arquitectura están probadas. Las implementaciones de plataforma requieren integración cuidadosa con Android Keystore e iOS Keychain APIs, que son código de alto riesgo que debe implementarse con infraestructura de testing apropiada. |
+| **`SecurityError` refleja la estructura de `NetworkError`** | Ambos usan sealed classes con `message` (seguro para usuario) + `diagnostic` (interno). Esta estructura paralela simplifica el manejo de errores en consumidores que puentean ambos módulos. |
+| **`Base64` es una implementación manual** | La stdlib común de Kotlin no provee codificación Base64. La implementación manual evita una dependencia en `kotlinx-io` o APIs específicas de plataforma para una utilidad trivial. |
+| **`DefaultLogSanitizer` usa matching por clave, no por patrón** | Simple, predecible y rápido. Si una clave está en el set de sensibles, su valor se redacta completamente. Sin regex, sin redacción parcial, sin falsos negativos. |
 
 ---
 
-## Platform Implementation Details
+## Detalles de Implementación de Plataforma
 
 ### Android: `AndroidSecretStore`
 
-| Aspect | Detail |
+| Aspecto | Detalle |
 |---|---|
 | **Backend** | `EncryptedSharedPreferences` + Android Keystore |
-| **Encryption** | AES-256-GCM for values, AES-256-SIV for keys |
-| **Key management** | `MasterKey` with configurable StrongBox backing |
-| **Threading** | All operations dispatched to `Dispatchers.IO` |
-| **Configuration** | `AndroidStoreConfig` — preferences name, master key alias, key prefix, StrongBox flag |
-| **Status** | Skeleton with step-by-step TODOs. Requires `androidx.security:security-crypto:1.1.0-alpha06`. |
+| **Encriptación** | AES-256-GCM para valores, AES-256-SIV para claves |
+| **Gestión de claves** | `MasterKey` con backing StrongBox configurable |
+| **Threading** | Todas las operaciones despachadas a `Dispatchers.IO` |
+| **Configuración** | `AndroidStoreConfig` — nombre de preferences, alias de master key, prefijo de clave, flag de StrongBox |
+| **Estado** | Skeleton con TODOs paso a paso. Requiere `androidx.security:security-crypto:1.1.0-alpha06`. |
 
 ### iOS: `IosSecretStore`
 
-| Aspect | Detail |
+| Aspecto | Detalle |
 |---|---|
 | **Backend** | Keychain Services (`kSecClassGenericPassword`) |
 | **APIs** | `SecItemAdd`, `SecItemCopyMatching`, `SecItemUpdate`, `SecItemDelete` |
-| **Configuration** | `KeychainConfig` — service name, access group, accessibility level |
-| **Accessibility levels** | `WHEN_UNLOCKED`, `AFTER_FIRST_UNLOCK`, `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY`, device-only variants |
-| **Threading** | All operations dispatched to `Dispatchers.IO` |
-| **Status** | Skeleton with step-by-step TODOs. Uses `platform.Security` framework via cinterop (built-in). |
+| **Configuración** | `KeychainConfig` — nombre de servicio, grupo de acceso, nivel de accesibilidad |
+| **Niveles de accesibilidad** | `WHEN_UNLOCKED`, `AFTER_FIRST_UNLOCK`, `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY`, variantes device-only |
+| **Threading** | Todas las operaciones despachadas a `Dispatchers.IO` |
+| **Estado** | Skeleton con TODOs paso a paso. Usa framework `platform.Security` vía cinterop (incorporado). |
 
 ---
 
-## Extensibility
+## Extensibilidad
 
-| Extension Point | How |
+| Punto de Extensión | Cómo |
 |---|---|
-| **New credential type** | Add to `Credential` sealed interface + update `CredentialHeaderMapper.toHeaders()` |
-| **Custom credential provider** | Implement `CredentialProvider` backed by your auth system |
-| **Custom secret store** | Implement `SecretStore` for a different backend (e.g., SQLCipher, in-memory for testing) |
-| **Custom trust policy** | Implement `TrustPolicy` with your pin sets and host rules |
-| **Custom log sanitization** | Implement `LogSanitizer` with pattern-based or context-aware redaction |
-| **New session events** | Add to `SessionEvent` sealed class (requires modifying the file) |
-| **New security errors** | Add to `SecurityError` sealed class |
+| **Nuevo tipo de credencial** | Agregar a la sealed interface `Credential` + actualizar `CredentialHeaderMapper.toHeaders()` |
+| **Proveedor de credenciales personalizado** | Implementar `CredentialProvider` respaldado por tu sistema de auth |
+| **Almacén de secretos personalizado** | Implementar `SecretStore` para un backend diferente (ej. SQLCipher, en memoria para testing) |
+| **Política de confianza personalizada** | Implementar `TrustPolicy` con tus conjuntos de pines y reglas de host |
+| **Sanitización de logs personalizada** | Implementar `LogSanitizer` con redacción basada en patrones o consciente del contexto |
+| **Nuevos eventos de sesión** | Agregar a la sealed class `SessionEvent` (requiere modificar el archivo) |
+| **Nuevos errores de seguridad** | Agregar a la sealed class `SecurityError` |
 
 ---
 
-## Current Limitations
+## Limitaciones Actuales
 
-| Limitation | Context |
+| Limitación | Contexto |
 |---|---|
-| **Platform `SecretStore` implementations are skeletons** | `AndroidSecretStore` and `IosSecretStore` have TODO bodies with detailed implementation guidance, but do not compile to working code yet. |
-| **No `SessionController` implementation** | The interface and state model are defined, but no `DefaultSessionController` exists. This requires working `SecretStore` implementations first. |
-| **`Diagnostic` is duplicated with `:network-core`** | Both modules define identical `Diagnostic` data classes. A future `:platform-common` module should unify them. |
-| **No biometric authentication** | `SecretStore` does not support biometric-gated access (e.g., `setUserAuthenticationRequired` on Android, `kSecAccessControlBiometryAny` on iOS). |
-| **`CredentialProvider` lacks refresh/invalidate hooks** | Current interface only has `current()`. Token refresh and invalidation require future `refresh()` and `invalidate()` methods. |
+| **Las implementaciones de `SecretStore` de plataforma son skeletons** | `AndroidSecretStore` e `IosSecretStore` tienen cuerpos TODO con guía de implementación detallada, pero aún no compilan a código funcional. |
+| **Sin implementación de `SessionController`** | La interfaz y el modelo de estado están definidos, pero no existe `DefaultSessionController`. Esto requiere implementaciones funcionales de `SecretStore` primero. |
+| **`Diagnostic` está duplicado con `:network-core`** | Ambos módulos definen data classes `Diagnostic` idénticas. Un futuro módulo `:platform-common` debería unificarlas. |
+| **Sin autenticación biométrica** | `SecretStore` no soporta acceso restringido por biometría (ej. `setUserAuthenticationRequired` en Android, `kSecAccessControlBiometryAny` en iOS). |
+| **`CredentialProvider` carece de hooks de refresh/invalidate** | La interfaz actual solo tiene `current()`. El refresh e invalidación de tokens requieren futuros métodos `refresh()` e `invalidate()`. |
 
 ---
 
-## TODOs and Future Work
+## TODOs y Trabajo Futuro
 
-| Item | Location | Description |
+| Ítem | Ubicación | Descripción |
 |---|---|---|
-| Complete `AndroidSecretStore` | `androidMain/store/` | Wire EncryptedSharedPreferences with MasterKey + error mapping |
-| Complete `IosSecretStore` | `iosMain/store/` | Wire Keychain Services with proper OSStatus error handling |
-| `DefaultSessionController` | `session/` | StateFlow-based implementation with token storage and refresh logic |
-| `CredentialProvider` impl | `credential/` | Backed by `SessionController` + `SecretStore` |
-| `refresh()` on `CredentialProvider` | `credential/` | Proactive token refresh before expiry |
-| `invalidate()` on `CredentialProvider` | `credential/` | Clear cached credential on 401 |
-| `invalidate()` on `SessionController` | `session/` | Force-logout from any layer |
-| `RefreshOutcome` sealed result | `session/` | Replace `Boolean` return from `refreshSession()` with semantic result |
-| `isAuthenticated` convenience | `SessionController` | Derived from `state` for simple checks |
-| `keys()` on `SecretStore` | `store/` | Enumerate stored keys for migration/diagnostics |
-| `putStringIfAbsent()` on `SecretStore` | `store/` | Atomic write-if-missing for race-free initialization |
-| Biometric integration | `store/` | Platform-specific biometric gating for secret access |
-| Unify `Diagnostic` | cross-module | Extract to `:platform-common` shared module |
+| Completar `AndroidSecretStore` | `androidMain/store/` | Conectar EncryptedSharedPreferences con MasterKey + mapeo de errores |
+| Completar `IosSecretStore` | `iosMain/store/` | Conectar Keychain Services con manejo apropiado de errores OSStatus |
+| `DefaultSessionController` | `session/` | Implementación basada en StateFlow con almacenamiento de tokens y lógica de refresh |
+| Impl de `CredentialProvider` | `credential/` | Respaldado por `SessionController` + `SecretStore` |
+| `refresh()` en `CredentialProvider` | `credential/` | Refresh proactivo de token antes de expiración |
+| `invalidate()` en `CredentialProvider` | `credential/` | Limpiar credencial cacheada en 401 |
+| `invalidate()` en `SessionController` | `session/` | Forzar logout desde cualquier capa |
+| Resultado sealed `RefreshOutcome` | `session/` | Reemplazar retorno `Boolean` de `refreshSession()` con resultado semántico |
+| Conveniencia `isAuthenticated` | `SessionController` | Derivado de `state` para verificaciones simples |
+| `keys()` en `SecretStore` | `store/` | Enumerar claves almacenadas para migración/diagnósticos |
+| `putStringIfAbsent()` en `SecretStore` | `store/` | Escritura atómica si-ausente para inicialización libre de race conditions |
+| Integración biométrica | `store/` | Restricción biométrica específica de plataforma para acceso a secretos |
+| Unificar `Diagnostic` | cross-module | Extraer a módulo compartido `:platform-common` |
 
 ---
 
-## Dependencies
+## Dependencias
 
 ```toml
-# Only dependency — no networking, no serialization
+# Única dependencia — sin networking, sin serialización
 [dependencies]
 kotlinx-coroutines-core = "1.10.1"
 ```
 
-This module compiles to **all targets**: Android, iosX64, iosArm64, iosSimulatorArm64.
+Este módulo compila para **todos los targets**: Android, iosX64, iosArm64, iosSimulatorArm64.
