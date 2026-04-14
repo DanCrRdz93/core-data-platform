@@ -411,7 +411,7 @@ class ProductionTrustPolicy : TrustPolicy {
 | **`CredentialHeaderMapper` retorna `Map<String, String>`** | El mapper convierte credenciales a pares de headers simples sin importar `HttpRequest`, `RequestInterceptor`, ni ningún tipo de red. Esto mantiene el límite limpio. |
 | **`SessionController.state` es `StateFlow`** | Habilita observación reactiva de UI. Una propiedad `val state: SessionState` requeriría polling. `StateFlow` da a los suscriptores acceso inmediato al valor actual y actualizaciones reactivas. |
 | **`Credential` es una sealed interface** | Matching exhaustivo en tiempo de compilación vía `when`. Todos los tipos de credenciales son conocidos, lo que previene sorpresas en runtime. `Custom` es la vía de escape para esquemas propietarios. |
-| **Las implementaciones de plataforma son skeletons con TODOs** | La interfaz y arquitectura están probadas. Las implementaciones de plataforma requieren integración cuidadosa con Android Keystore e iOS Keychain APIs, que son código de alto riesgo que debe implementarse con infraestructura de testing apropiada. |
+| **Las implementaciones de plataforma usan APIs nativas** | `AndroidSecretStore` usa `EncryptedSharedPreferences` + Android Keystore. `IosSecretStore` usa Keychain Services (`SecItem*` APIs). Ambas están completamente implementadas con manejo de errores y dispatching a `Dispatchers.IO`. |
 | **`SecurityError` refleja la estructura de `NetworkError`** | Ambos usan sealed classes con `message` (seguro para usuario) + `diagnostic` (interno). Esta estructura paralela simplifica el manejo de errores en consumidores que puentean ambos módulos. |
 | **`Base64` es una implementación manual** | La stdlib común de Kotlin no provee codificación Base64. La implementación manual evita una dependencia en `kotlinx-io` o APIs específicas de plataforma para una utilidad trivial. |
 | **`DefaultLogSanitizer` usa matching por clave, no por patrón** | Simple, predecible y rápido. Si una clave está en el set de sensibles, su valor se redacta completamente. Sin regex, sin redacción parcial, sin falsos negativos. |
@@ -429,7 +429,7 @@ class ProductionTrustPolicy : TrustPolicy {
 | **Gestión de claves** | `MasterKey` con backing StrongBox configurable |
 | **Threading** | Todas las operaciones despachadas a `Dispatchers.IO` |
 | **Configuración** | `AndroidStoreConfig` — nombre de preferences, alias de master key, prefijo de clave, flag de StrongBox |
-| **Estado** | Skeleton con TODOs paso a paso. Requiere `androidx.security:security-crypto:1.1.0-alpha06`. |
+| **Estado** | ✅ Completamente implementado. Requiere `androidx.security:security-crypto:1.1.0-alpha06`. |
 
 ### iOS: `IosSecretStore`
 
@@ -440,7 +440,7 @@ class ProductionTrustPolicy : TrustPolicy {
 | **Configuración** | `KeychainConfig` — nombre de servicio, grupo de acceso, nivel de accesibilidad |
 | **Niveles de accesibilidad** | `WHEN_UNLOCKED`, `AFTER_FIRST_UNLOCK`, `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY`, variantes device-only |
 | **Threading** | Todas las operaciones despachadas a `Dispatchers.IO` |
-| **Estado** | Skeleton con TODOs paso a paso. Usa framework `platform.Security` vía cinterop (incorporado). |
+| **Estado** | ✅ Completamente implementado. Usa framework `platform.Security` vía cinterop (incorporado). |
 
 ---
 
@@ -462,29 +462,28 @@ class ProductionTrustPolicy : TrustPolicy {
 
 | Limitación | Contexto |
 |---|---|
-| **Las implementaciones de `SecretStore` de plataforma son skeletons** | `AndroidSecretStore` e `IosSecretStore` tienen cuerpos TODO con guía de implementación detallada, pero aún no compilan a código funcional. |
-| **Sin implementación de `SessionController`** | La interfaz y el modelo de estado están definidos, pero no existe `DefaultSessionController`. Esto requiere implementaciones funcionales de `SecretStore` primero. |
 | **`Diagnostic` está duplicado con `:network-core`** | Ambos módulos definen data classes `Diagnostic` idénticas. Un futuro módulo `:platform-common` debería unificarlas. |
 | **Sin autenticación biométrica** | `SecretStore` no soporta acceso restringido por biometría (ej. `setUserAuthenticationRequired` en Android, `kSecAccessControlBiometryAny` en iOS). |
-| **`CredentialProvider` carece de hooks de refresh/invalidate** | La interfaz actual solo tiene `current()`. El refresh e invalidación de tokens requieren futuros métodos `refresh()` e `invalidate()`. |
 
 ---
 
-## TODOs y Trabajo Futuro
+## Completado
 
 | Ítem | Ubicación | Descripción |
 |---|---|---|
-| Completar `AndroidSecretStore` | `androidMain/store/` | Conectar EncryptedSharedPreferences con MasterKey + mapeo de errores |
-| Completar `IosSecretStore` | `iosMain/store/` | Conectar Keychain Services con manejo apropiado de errores OSStatus |
-| `DefaultSessionController` | `session/` | Implementación basada en StateFlow con almacenamiento de tokens y lógica de refresh |
-| Impl de `CredentialProvider` | `credential/` | Respaldado por `SessionController` + `SecretStore` |
-| `refresh()` en `CredentialProvider` | `credential/` | Refresh proactivo de token antes de expiración |
-| `invalidate()` en `CredentialProvider` | `credential/` | Limpiar credencial cacheada en 401 |
-| `invalidate()` en `SessionController` | `session/` | Forzar logout desde cualquier capa |
-| Resultado sealed `RefreshOutcome` | `session/` | Reemplazar retorno `Boolean` de `refreshSession()` con resultado semántico |
-| Conveniencia `isAuthenticated` | `SessionController` | Derivado de `state` para verificaciones simples |
-| `keys()` en `SecretStore` | `store/` | Enumerar claves almacenadas para migración/diagnósticos |
-| `putStringIfAbsent()` en `SecretStore` | `store/` | Escritura atómica si-ausente para inicialización libre de race conditions |
+| ✅ `AndroidSecretStore` | `androidMain/store/` | EncryptedSharedPreferences + MasterKey + AES-256-GCM + mapeo de errores |
+| ✅ `IosSecretStore` | `iosMain/store/` | Keychain Services (`SecItem*` APIs) con manejo de errores OSStatus |
+| ✅ `DefaultSessionController` | `session/` | StateFlow, persistencia de tokens, refresh, invalidate, endSession |
+| ✅ `DefaultCredentialProvider` | `credential/` | Respaldado por `SessionController` — `current()`, `refresh()`, `invalidate()` |
+| ✅ `RefreshOutcome` sealed | `session/` | `Refreshed`, `NotNeeded`, `Failed` — reemplaza retorno `Boolean` |
+| ✅ `isAuthenticated` | `SessionController` | Derivado de `state` — `true` solo cuando `Active` |
+| ✅ `keys()` en `SecretStore` | `store/` | Enumerar claves almacenadas (Android: filter por prefijo, iOS: Keychain enumeration) |
+| ✅ `putStringIfAbsent()` en `SecretStore` | `store/` | Escritura atómica si-ausente en ambas plataformas |
+
+## Trabajo Futuro
+
+| Ítem | Ubicación | Descripción |
+|---|---|---|
 | Integración biométrica | `store/` | Restricción biométrica específica de plataforma para acceso a secretos |
 | Unificar `Diagnostic` | cross-module | Extraer a módulo compartido `:platform-common` |
 

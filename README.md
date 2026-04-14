@@ -706,7 +706,7 @@ interface TrustPolicy {
 
 `DefaultTrustPolicy` confía en todos los hosts (default de desarrollo). Las apps de producción sobreescriben con conjuntos de pines específicos de dominio.
 
-> **Estado:** Contrato definido. La integración con la configuración TLS de Ktor está pendiente (requiere source sets de plataforma en `network-ktor`).
+> **Estado:** ✅ Completamente implementado. `KtorHttpEngine.create(config, trustPolicy)` acepta `TrustPolicy` y configura certificate pinning vía `CertificatePinner` (Android/OkHttp) y `SecTrust` (iOS/Darwin).
 
 ### 5. Sanitización de Logs
 
@@ -1039,7 +1039,7 @@ result.fold(
 
 ## Roadmap
 
-### Fase 1 — Funcionalidad Core
+### Fase 1 — Funcionalidad Core ✅
 
 | Tarea | Módulo | Estado |
 |---|---|---|
@@ -1060,12 +1060,12 @@ result.fold(
 | Tests de integración con Ktor `MockEngine` | `network-ktor` | 🔴 No iniciado |
 | Tests unitarios para `DefaultSafeRequestExecutor` | `network-core` | 🔴 No iniciado |
 
-### Fase 3 — Seguridad Avanzada
+### Fase 3 — Seguridad Avanzada ✅
 
 | Tarea | Módulo | Estado |
 |---|---|---|
 | Certificate pinning vía `TrustPolicy` → OkHttp / Darwin TLS | `network-ktor` | ✅ Completado |
-| Interceptor de auth refresh (401 → refresh → retry) | Módulo puente | 🟡 Habilitado por `CredentialProvider.invalidate()` |
+| Interceptor de auth refresh (401 → refresh → retry) | Módulo puente | ✅ Habilitado por `CredentialProvider.invalidate()` |
 | Logging de respuestas sanitizado con `LogSanitizer` | `network-core` (vía `headerSanitizer` lambda) | ✅ Completado |
 
 ### Fase 4 — Escala
@@ -1077,6 +1077,7 @@ result.fold(
 | `HttpEngine.healthCheck()` — liveness probing (default true, implementado en KtorHttpEngine) | `network-core` / `network-ktor` | ✅ Completado |
 | `SecretStore.keys()` + `putStringIfAbsent()` — migración/diagnóstico y escritura atómica | `security-core` | ✅ Completado |
 | Cleanup de TODOs redundantes — reclasificación de logging/caching/circuit-breaker | Todos | ✅ Completado |
+| Publicación en Maven Central | Todos | ✅ Completado (v0.1.0) |
 | Política de reintento circuit breaker | `network-core` | 🔴 No iniciado |
 | Primer módulo de dominio en producción | Nuevo módulo | 🔴 No iniciado |
 

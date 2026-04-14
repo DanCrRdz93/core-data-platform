@@ -424,10 +424,11 @@ class MetricsObserver(private val client: MetricsClient) : NetworkEventObserver 
 
 ---
 
-## Completado Recientemente
+## Completado
 
 | Ítem | Ubicación | Descripción |
 |---|---|---|
+| ✅ `LoggingObserver` + `NetworkLogger` | `observability/` | Logging del ciclo de vida de requests con sanitización de headers. Backend inyectable (NOOP default) |
 | ✅ `MetricsObserver` + `MetricsCollector` | `observability/` | Registra conteo de requests, latencia, errores, retries vía backend inyectable (NOOP default) |
 | ✅ `TracingObserver` + `TracingBackend` | `observability/` | Genera span/trace IDs, reporta inicio/fin de spans vía backend inyectable (NOOP default) |
 | ✅ `HttpEngine.healthCheck()` | `client/` | Liveness probing con default `true`. `KtorHttpEngine` verifica estado del engine |

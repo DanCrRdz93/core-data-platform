@@ -196,26 +196,22 @@ val engine = KtorHttpEngine(customClient)
 
 ## Extensibilidad
 
-### Agregar certificate pinning
+### Certificate pinning
 
-El factory `KtorHttpEngine.create()` contiene un TODO mostrando exactamente dónde se conecta la configuración TLS:
+`KtorHttpEngine.create()` acepta un parámetro opcional `TrustPolicy` de `:security-core`. Cuando se provee, el certificate pinning se aplica a nivel de plataforma:
 
-```kotlin
-// Android (OkHttp): engine { config { certificatePinner(...) } }
-// iOS (Darwin):     handleChallenge in NSURLSessionDelegate
-```
+- **Android (OkHttp):** vía `CertificatePinner`
+- **iOS (Darwin):** vía `handleChallenge` con evaluación `SecTrust`
 
-Esto requerirá agregar source sets `androidMain` e `iosMain` a este módulo.
+Cuando `trustPolicy` es `null` (default), se usa la confianza del sistema sin pinning.
 
 ### Agregar logging a nivel de transporte
 
-El factory contiene un TODO para el plugin `Logging` de Ktor:
+El plugin `Logging` de Ktor aún no está instalado. El logging actualmente se maneja vía `NetworkEventObserver` en `:network-core`. Una futura mejora podría instalar el plugin conectado a `LogSanitizer`:
 
 ```kotlin
 // install(Logging) { logger = SanitizedKtorLogger(logSanitizer) }
 ```
-
-Esto se conectaría con `LogSanitizer` de `:security-core` para redactar headers sensibles en logs a nivel de transporte.
 
 ### Reemplazar Ktor completamente
 
@@ -233,18 +229,22 @@ Cambia la dependencia en módulos de dominio de `:network-ktor` a `:network-okht
 
 | Limitación | Contexto |
 |---|---|
-| **Sin certificate pinning** | El TODO está documentado pero la integración con `TrustPolicy` requiere source sets de plataforma que aún no existen en este módulo. |
 | **Sin logging a nivel de transporte** | El plugin `Logging` de Ktor no está instalado. Todo el logging actualmente debe ir a través de `ResponseInterceptor` y `NetworkEventObserver` en `:network-core`. |
 | **Sin soporte de WebSocket** | `HttpEngine` es solo request-response. WebSocket necesitaría un contrato separado. |
 | **Sin subida multipart** | `HttpRequest.body` es un `ByteArray` plano. Multipart requeriría extender el modelo de request. |
 
 ---
 
-## TODOs y Trabajo Futuro
+## Completado
 
 | Ítem | Descripción |
 |---|---|
-| **Certificate pinning** | Aceptar `TrustPolicy` en `create()`, configurar `CertificatePinner` de OkHttp (Android) y `SecTrust` de Darwin (iOS) vía source sets de plataforma |
+| ✅ **Certificate pinning** | `create(config, trustPolicy)` acepta `TrustPolicy` de `:security-core`. Configura `CertificatePinner` (Android/OkHttp) y `SecTrust` (iOS/Darwin) vía source sets de plataforma |
+
+## Trabajo Futuro
+
+| Ítem | Descripción |
+|---|---|
 | **Plugin de logging** | Instalar `Logging` de Ktor conectado a `LogSanitizer` para logging de request/response a nivel de transporte |
 | **Configuración de pool de conexiones** | Exponer pool de conexiones de OkHttp / configuración de sesión de Darwin vía `NetworkConfig` |
 | **Soporte multipart** | Extender `HttpRequest` con un modelo de body multipart y traducir al `MultiPartFormDataContent` de Ktor |
