@@ -1,5 +1,7 @@
 # Core Data Platform
 
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+
 **SDK Kotlin Multiplatform para Acceso Remoto Seguro de Datos**
 
 Una librería Kotlin Multiplatform (KMP) reutilizable y modular diseñada para proveer una base segura, escalable y agnóstica de transporte para operaciones de datos remotos en aplicaciones Android e iOS.
