@@ -8,6 +8,7 @@ Una librería Kotlin Multiplatform (KMP) reutilizable y modular diseñada para p
 
 ## Tabla de Contenidos
 
+- [Documentación](#documentación)
 - [Resumen](#resumen)
 - [Objetivos del Proyecto](#objetivos-del-proyecto)
 - [Arquitectura](#arquitectura)
@@ -25,6 +26,42 @@ Una librería Kotlin Multiplatform (KMP) reutilizable y modular diseñada para p
 - [Ejemplo de Integración](#ejemplo-de-integración)
 - [Roadmap](#roadmap)
 - [Reglas de Diseño](#reglas-de-diseño)
+
+---
+
+## Documentación
+
+### Guías
+
+- [Guía de Integración](docs/integration-guide.md) — Cómo agregar el SDK como dependencia y conectar módulos de dominio
+- [Guía Rápida para Android](docs/android-quickstart.md) — Primeros pasos para desarrolladores Android sin contexto previo
+- [Integración con Clean Architecture](docs/clean-architecture-integration.md) — Cómo usar el SDK en la capa `data` de un proyecto con Clean Architecture
+
+### READMEs de Módulos
+
+- [network-core](network-core/README.md) — Abstracciones puras de red, pipeline de ejecución, taxonomía de errores
+- [network-ktor](network-ktor/README.md) — Adaptador de transporte HTTP basado en Ktor
+- [security-core](security-core/README.md) — Credenciales, sesiones, almacenamiento seguro, confianza TLS, sanitización de logs
+- [sample-api](sample-api/README.md) — Módulo piloto de referencia para integración de API de dominio
+
+### Registros de Decisiones de Arquitectura (ADRs)
+
+- [Índice de ADRs](docs/adr/README.md)
+- [ADR-001: Separación network-core / security-core](docs/adr/ADR-001-separation-network-core-security-core.md)
+- [ADR-002: Contratos primero, implementación después](docs/adr/ADR-002-contracts-first-implementation-after.md)
+- [ADR-003: Sin detalles de transporte en API pública](docs/adr/ADR-003-no-transport-details-in-public-api.md)
+- [ADR-004: Separación commonMain / platformMain](docs/adr/ADR-004-commonmain-platformmain-separation.md)
+- [ADR-005: Pipeline de ejecución segura centralizado](docs/adr/ADR-005-centralized-safe-execution-pipeline.md)
+- [ADR-006: Clasificación de errores centralizada](docs/adr/ADR-006-centralized-error-classification.md)
+
+### Diagramas
+
+- [Índice de Diagramas](docs/diagrams/README.md)
+- [01 — Arquitectura General](docs/diagrams/01-general-architecture.md)
+- [02 — Dependencias entre Módulos](docs/diagrams/02-module-dependencies.md)
+- [03 — Flujo de Ejecución de Requests](docs/diagrams/03-request-execution-flow.md)
+- [04 — Estrategia KMP](docs/diagrams/04-kmp-strategy.md)
+- [05 — Relaciones entre Contratos](docs/diagrams/05-contract-relationships.md)
 
 ---
 
