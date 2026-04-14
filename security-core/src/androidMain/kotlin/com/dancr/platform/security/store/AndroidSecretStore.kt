@@ -1,72 +1,90 @@
 package com.dancr.platform.security.store
 
 import android.content.Context
+import android.content.SharedPreferences
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import com.dancr.platform.security.error.Diagnostic
 import com.dancr.platform.security.error.SecurityError
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-
-// Integration dependency (add when implementing):
-//   androidMain.dependencies {
-//       implementation("androidx.security:security-crypto:1.1.0-alpha06")
-//   }
+import android.util.Base64 as AndroidBase64
 
 class AndroidSecretStore(
     private val context: Context,
     private val config: AndroidStoreConfig = AndroidStoreConfig()
 ) : SecretStore {
 
-    // TODO: Initialize EncryptedSharedPreferences lazily:
-    //
-    // private val prefs: SharedPreferences by lazy {
-    //     val masterKey = MasterKey.Builder(context, config.masterKeyAlias)
-    //         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-    //         .setRequestStrongBoxBacked(config.useStrongBox)
-    //         .build()
-    //     EncryptedSharedPreferences.create(
-    //         context,
-    //         config.preferencesName,
-    //         masterKey,
-    //         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-    //         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    //     )
-    // }
+    private val prefs: SharedPreferences by lazy {
+        val masterKey = MasterKey.Builder(context, config.masterKeyAlias)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .setRequestStrongBoxBacked(config.useStrongBox)
+            .build()
+        EncryptedSharedPreferences.create(
+            context,
+            config.preferencesName,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
 
     override suspend fun putString(key: String, value: String): Unit = runOnDisk {
-        // TODO: prefs.edit().putString(prefixedKey(key), value).apply()
-        TODO("Store string via EncryptedSharedPreferences")
+        try {
+            prefs.edit().putString(prefixedKey(key), value).apply()
+        } catch (e: Exception) {
+            throw mapException(e)
+        }
     }
 
     override suspend fun getString(key: String): String? = runOnDisk {
-        // TODO: prefs.getString(prefixedKey(key), null)
-        TODO("Retrieve string via EncryptedSharedPreferences")
+        try {
+            prefs.getString(prefixedKey(key), null)
+        } catch (e: Exception) {
+            throw mapException(e)
+        }
     }
 
     override suspend fun putBytes(key: String, value: ByteArray): Unit = runOnDisk {
-        // TODO: Encode to Base64 and store via prefs,
-        //       or use KeyStore.getInstance("AndroidKeyStore") directly for raw key material
-        TODO("Store binary secret")
+        try {
+            val encoded = AndroidBase64.encodeToString(value, AndroidBase64.NO_WRAP)
+            prefs.edit().putString(prefixedKey(key), encoded).apply()
+        } catch (e: Exception) {
+            throw mapException(e)
+        }
     }
 
     override suspend fun getBytes(key: String): ByteArray? = runOnDisk {
-        // TODO: Retrieve Base64-encoded string and decode,
-        //       or read from AndroidKeyStore directly
-        TODO("Retrieve binary secret")
+        try {
+            prefs.getString(prefixedKey(key), null)
+                ?.let { AndroidBase64.decode(it, AndroidBase64.NO_WRAP) }
+        } catch (e: Exception) {
+            throw mapException(e)
+        }
     }
 
     override suspend fun remove(key: String): Unit = runOnDisk {
-        // TODO: prefs.edit().remove(prefixedKey(key)).apply()
-        TODO("Remove entry")
+        try {
+            prefs.edit().remove(prefixedKey(key)).apply()
+        } catch (e: Exception) {
+            throw mapException(e)
+        }
     }
 
     override suspend fun clear(): Unit = runOnDisk {
-        // TODO: prefs.edit().clear().apply()
-        TODO("Clear all entries")
+        try {
+            prefs.edit().clear().apply()
+        } catch (e: Exception) {
+            throw mapException(e)
+        }
     }
 
     override suspend fun contains(key: String): Boolean = runOnDisk {
-        // TODO: prefs.contains(prefixedKey(key))
-        TODO("Check key existence")
+        try {
+            prefs.contains(prefixedKey(key))
+        } catch (e: Exception) {
+            throw mapException(e)
+        }
     }
 
     // -- Internal helpers --
@@ -78,7 +96,6 @@ class AndroidSecretStore(
 
     // -- Error mapping --
 
-    @Suppress("unused")
     private fun mapException(e: Exception): SecurityError.SecureStorageFailure =
         SecurityError.SecureStorageFailure(
             diagnostic = Diagnostic(

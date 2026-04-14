@@ -30,7 +30,7 @@ Cada clase en este módulo es una **interfaz**, una **sealed class**, una **data
 | Modelar errores con mensajes seguros para usuario + diagnósticos internos | `NetworkError`, `Diagnostic` |
 | Envolver resultados con semántica de éxito/fallo | `NetworkResult<T>`, `ResponseMetadata` |
 | Configurar comportamiento de reintentos | `RetryPolicy` (None, FixedDelay, ExponentialBackoff) |
-| Proveer hooks de observabilidad | `NetworkEventObserver` |
+| Proveer hooks de observabilidad | `NetworkEventObserver`, `LoggingObserver`, `NetworkLogger` |
 | Proveer clase base para data sources remotos | `RemoteDataSource` |
 | Contener configuración de red | `NetworkConfig` |
 
@@ -173,7 +173,9 @@ network-core/src/commonMain/kotlin/com/dancr/platform/network/
 │   └── RequestContext.kt           # Metadata por request (operationId, tags, tracing)
 │
 ├── observability/                  # Hooks de observabilidad
-│   └── NetworkEventObserver.kt     # Callbacks de ciclo de vida con default no-op
+│   ├── NetworkEventObserver.kt     # Callbacks de ciclo de vida con default no-op
+│   ├── NetworkLogger.kt            # fun interface — abstracción de logging (no-op por defecto)
+│   └── LoggingObserver.kt          # Observer que registra requests/responses vía NetworkLogger
 │
 └── result/                         # Tipos de resultado
     ├── NetworkResult.kt            # Sealed: Success<T> | Failure
@@ -294,7 +296,49 @@ val loggingInterceptor = ResponseInterceptor { response, request, context ->
 }
 ```
 
-### Observer personalizado
+### Logging con LoggingObserver
+
+`LoggingObserver` implementa `NetworkEventObserver` y delega la salida a un `NetworkLogger` inyectable. **Por defecto es no-op** — el SDK nunca imprime nada a menos que el consumidor configure un logger.
+
+```kotlin
+import com.dancr.platform.network.observability.LoggingObserver
+import com.dancr.platform.network.observability.NetworkLogger
+
+// 1. Define tu backend de logging
+val logger = NetworkLogger { level, tag, message ->
+    println("[$tag] ${level.name}: $message")  // o Timber, Logcat, os_log, etc.
+}
+
+// 2. Crea el observer con sanitización de headers
+val loggingObserver = LoggingObserver(
+    logger = logger,
+    tag = "MyApp",
+    // Conecta LogSanitizer de :security-core para redactar headers sensibles
+    headerSanitizer = { key, value -> logSanitizer.sanitize(key, value) }
+)
+
+// 3. Pásalo al executor
+val executor = DefaultSafeRequestExecutor(
+    engine = myEngine,
+    config = config,
+    observers = listOf(loggingObserver)
+)
+```
+
+Output de ejemplo:
+```
+[MyApp] DEBUG: --> GET https://api.example.com/users [Accept: application/json, Authorization: ██]
+[MyApp] INFO: <-- 200 GET https://api.example.com/users (142ms)
+[MyApp] WARN: ⟳ Retry 1/3 for GET /orders after 1000ms — Unable to reach the server
+[MyApp] ERROR: FAILED GET /orders (5023ms) — The request timed out
+```
+
+**Límites importantes:**
+- **El backend de logging lo define el consumidor.** `NetworkLogger.NOOP` es el default.
+- **Siempre sanitiza en producción.** El parámetro `headerSanitizer` redacta valores antes de loggear. Conecta `DefaultLogSanitizer` de `:security-core`.
+- **Los observers son solo para observabilidad.** No usar para lógica de negocio ni side effects que afecten el flujo de la request.
+
+### Observer personalizado (métricas)
 
 ```kotlin
 class MetricsObserver(private val client: MetricsClient) : NetworkEventObserver {
@@ -334,7 +378,8 @@ class MetricsObserver(private val client: MetricsClient) : NetworkEventObserver 
 | **Validación de respuesta personalizada** | Implementar `ResponseValidator` (ej. rechazar respuestas sin un header requerido) |
 | **Procesamiento pre-request** | Agregar un `RequestInterceptor` (auth, tracing, headers custom) |
 | **Procesamiento post-respuesta** | Agregar un `ResponseInterceptor` (logging, caching, extracción de headers) |
-| **Observabilidad** | Implementar `NetworkEventObserver` (métricas, tracing, logging estructurado) |
+| **Logging** | Usar `LoggingObserver` con tu propio `NetworkLogger`. Sanitizar headers vía `headerSanitizer` lambda |
+| **Observabilidad personalizada** | Implementar `NetworkEventObserver` (métricas, tracing) |
 | **Políticas de reintento personalizadas** | Agregar nuevos subtipos de `RetryPolicy` (requiere modificar la sealed class) |
 
 ---
@@ -359,8 +404,6 @@ class MetricsObserver(private val client: MetricsClient) : NetworkEventObserver 
 | `classifyForRetry()` | `ErrorClassifier` | Clasificación por intento para patrones de circuit breaker |
 | `MetricsObserver` | `observability/` | Recolectar conteo de requests, histogramas de latencia, tasas de error |
 | `TracingObserver` | `observability/` | Crear spans por request, propagar `parentSpanId` vía headers |
-| `LoggingObserver` | `observability/` | Logging estructurado del ciclo de vida completo de requests |
-| `LoggingResponseInterceptor` | `execution/` | Logging centralizado de respuestas con integración de `LogSanitizer` |
 | `CachingResponseInterceptor` | `execution/` | Caching condicional basado en headers `Cache-Control` |
 | Circuit breaker `RetryPolicy` | `config/` | Abrir circuito después de N fallos consecutivos |
 
