@@ -34,10 +34,10 @@ class TracingObserver(
             backend.onSpanStarted(
                 traceId = traceId,
                 spanId = spanId,
-                operationName = "${request.method.name} ${request.path}",
+                operationName = "${request.method.name} ${sanitizePath(request.path)}",
                 tags = buildMap {
                     put("http.method", request.method.name)
-                    put("http.path", request.path)
+                    put("http.path", sanitizePath(request.path))
                     context?.operationId?.let { put("operation.id", it) }
                 }
             )
@@ -51,11 +51,11 @@ class TracingObserver(
         context: RequestContext?
     ) {
         backend.onSpanFinished(
-            operationName = "${request.method.name} ${request.path}",
+            operationName = "${request.method.name} ${sanitizePath(request.path)}",
             durationMs = durationMs,
             tags = mapOf(
                 "http.method" to request.method.name,
-                "http.path" to request.path,
+                "http.path" to sanitizePath(request.path),
                 "http.status_code" to response.statusCode.toString(),
                 "http.success" to response.isSuccessful.toString()
             ),
@@ -70,15 +70,19 @@ class TracingObserver(
         context: RequestContext?
     ) {
         backend.onSpanFinished(
-            operationName = "${request.method.name} ${request.path}",
+            operationName = "${request.method.name} ${sanitizePath(request.path)}",
             durationMs = durationMs,
             tags = mapOf(
                 "http.method" to request.method.name,
-                "http.path" to request.path,
+                "http.path" to sanitizePath(request.path),
                 "error.type" to (error::class.simpleName ?: "Unknown"),
                 "error.message" to error.message
             ),
             error = error.diagnostic?.cause
         )
     }
+
+    // OWASP MASVS-PRIVACY: strip query parameters from paths to prevent
+    // accidental token/secret leakage through tracing backends.
+    private fun sanitizePath(path: String): String = path.substringBefore("?")
 }

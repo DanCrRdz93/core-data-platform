@@ -8,14 +8,14 @@ import com.dancr.platform.network.result.NetworkError
 // Observes network lifecycle events and delegates formatted output to a NetworkLogger.
 // Keeps formatting minimal — the consumer controls the logging backend and verbosity.
 //
-// headerSanitizer: redacts sensitive header values before logging.
-//     Defaults to pass-through (no redaction). In production, wire this to
-//     security-core's DefaultLogSanitizer via the adapter:
-//         headerSanitizer = { key, value -> logSanitizer.sanitize(key, value) }
+// OWASP MASVS-PRIVACY: headerSanitizer defaults to REDACT ALL values.
+// The safe path is the default — no sensitive data leaks unless the consumer
+// explicitly provides a sanitizer. Wire security-core's DefaultLogSanitizer:
+//     headerSanitizer = { key, value -> logSanitizer.sanitize(key, value) }
 class LoggingObserver(
     private val logger: NetworkLogger = NetworkLogger.NOOP,
     private val tag: String = "CoreDataPlatform",
-    private val headerSanitizer: (key: String, value: String) -> String = { _, v -> v }
+    private val headerSanitizer: (key: String, value: String) -> String = REDACT_ALL
 ) : NetworkEventObserver {
 
     override fun onRequestStarted(request: HttpRequest, context: RequestContext?) {
@@ -72,5 +72,12 @@ class LoggingObserver(
             "$k: ${headerSanitizer(k, v)}"
         }
         return " [$sanitized]"
+    }
+
+    companion object {
+        // OWASP MASVS-PRIVACY default: redact ALL header values.
+        // Consumers who want selective visibility should provide their own sanitizer
+        // (e.g., security-core's DefaultLogSanitizer which only redacts sensitive keys).
+        val REDACT_ALL: (String, String) -> String = { _, _ -> "██" }
     }
 }

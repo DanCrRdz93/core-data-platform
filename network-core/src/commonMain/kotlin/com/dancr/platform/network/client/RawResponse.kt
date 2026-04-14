@@ -27,4 +27,7 @@ data class RawResponse(
         result = 31 * result + (body?.contentHashCode() ?: 0)
         return result
     }
+
+    override fun toString(): String =
+        "RawResponse(statusCode=$statusCode, headers=[${headers.keys.joinToString()}], body=${body?.size ?: 0} bytes)"
 }

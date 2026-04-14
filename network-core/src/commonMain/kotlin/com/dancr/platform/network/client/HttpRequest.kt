@@ -26,4 +26,8 @@ data class HttpRequest(
         result = 31 * result + (body?.contentHashCode() ?: 0)
         return result
     }
+
+    override fun toString(): String =
+        "HttpRequest(method=${method.name}, path=$path, headers=[${headers.keys.joinToString()}], " +
+            "queryParams=[${queryParams.keys.joinToString()}], body=${body?.size ?: 0} bytes)"
 }

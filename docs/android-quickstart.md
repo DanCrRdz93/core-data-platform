@@ -331,6 +331,36 @@ val myConfig = NetworkConfig(
 val repository = SampleApiFactory.create(config = myConfig)
 ```
 
+### Certificate Pinning
+
+Protege contra ataques MITM fijando los certificados esperados del servidor:
+
+```kotlin
+import com.dancr.platform.security.trust.DefaultTrustPolicy
+import com.dancr.platform.security.trust.CertificatePin
+import com.dancr.platform.network.ktor.KtorHttpEngine
+
+// 1. Define los pins (SHA-256 del certificado DER, codificado en base64)
+val trustPolicy = DefaultTrustPolicy(
+    pins = mapOf(
+        "api.tuempresa.com" to setOf(
+            CertificatePin(algorithm = "sha256", hash = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="),
+            CertificatePin(algorithm = "sha256", hash = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=")  // backup
+        )
+    )
+)
+
+// 2. Crea el engine con pinning habilitado
+val engine = KtorHttpEngine.create(config = myConfig, trustPolicy = trustPolicy)
+
+// 3. Úsalo en el executor o factory
+// La conexión se rechaza si ningún certificado del servidor coincide con los pins.
+```
+
+> **Importante:** Siempre incluye al menos un pin de respaldo. Si el certificado principal rota y no tienes backup, la app no podrá conectarse.
+>
+> En Android, el pinning usa `OkHttp CertificatePinner` internamente. El formato del hash es `sha256/<base64>`.
+
 ### Opciones de retry
 
 ```kotlin
