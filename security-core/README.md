@@ -307,7 +307,7 @@ graph TD
     subgraph platformSets["Platform Source Sets"]
         direction LR
         subgraph androidMain["androidMain"]
-            H["AndroidSecretStore<br/><i>EncryptedSharedPreferences</i>"]
+            H["AndroidSecretStore<br/><i>DataStore + Cipher + KeyStore</i>"]
             I[AndroidStoreConfig]
         end
 
@@ -411,7 +411,7 @@ class ProductionTrustPolicy : TrustPolicy {
 | **`CredentialHeaderMapper` retorna `Map<String, String>`** | El mapper convierte credenciales a pares de headers simples sin importar `HttpRequest`, `RequestInterceptor`, ni ningún tipo de red. Esto mantiene el límite limpio. |
 | **`SessionController.state` es `StateFlow`** | Habilita observación reactiva de UI. Una propiedad `val state: SessionState` requeriría polling. `StateFlow` da a los suscriptores acceso inmediato al valor actual y actualizaciones reactivas. |
 | **`Credential` es una sealed interface** | Matching exhaustivo en tiempo de compilación vía `when`. Todos los tipos de credenciales son conocidos, lo que previene sorpresas en runtime. `Custom` es la vía de escape para esquemas propietarios. |
-| **Las implementaciones de plataforma usan APIs nativas** | `AndroidSecretStore` usa `EncryptedSharedPreferences` + Android Keystore. `IosSecretStore` usa Keychain Services (`SecItem*` APIs). Ambas están completamente implementadas con manejo de errores y dispatching a `Dispatchers.IO`. |
+| **Las implementaciones de plataforma usan APIs nativas** | `AndroidSecretStore` usa DataStore Preferences + `Cipher`(AES/GCM/NoPadding) + Android Keystore. `IosSecretStore` usa Keychain Services (`SecItem*` APIs). Ambas están completamente implementadas con manejo de errores. |
 | **`SecurityError` refleja la estructura de `NetworkError`** | Ambos usan sealed classes con `message` (seguro para usuario) + `diagnostic` (interno). Esta estructura paralela simplifica el manejo de errores en consumidores que puentean ambos módulos. |
 | **`Base64` es una implementación manual** | La stdlib común de Kotlin no provee codificación Base64. La implementación manual evita una dependencia en `kotlinx-io` o APIs específicas de plataforma para una utilidad trivial. |
 | **`DefaultLogSanitizer` usa matching por clave, no por patrón** | Simple, predecible y rápido. Si una clave está en el set de sensibles, su valor se redacta completamente. Sin regex, sin redacción parcial, sin falsos negativos. |
@@ -424,12 +424,12 @@ class ProductionTrustPolicy : TrustPolicy {
 
 | Aspecto | Detalle |
 |---|---|
-| **Backend** | `EncryptedSharedPreferences` + Android Keystore |
-| **Encriptación** | AES-256-GCM para valores, AES-256-SIV para claves |
-| **Gestión de claves** | `MasterKey` con backing StrongBox configurable |
-| **Threading** | Todas las operaciones despachadas a `Dispatchers.IO` |
-| **Configuración** | `AndroidStoreConfig` — nombre de preferences, alias de master key, prefijo de clave, flag de StrongBox |
-| **Estado** | ✅ Completamente implementado. Requiere `androidx.security:security-crypto:1.1.0-alpha06`. |
+| **Backend** | DataStore Preferences + `Cipher`(AES/GCM/NoPadding) + Android Keystore |
+| **Encriptación** | AES-256-GCM para valores. IV generado automáticamente por `Cipher`, almacenado junto al ciphertext |
+| **Gestión de claves** | Clave AES-256 generada y almacenada en Android Keystore (non-exportable, hardware-backed) |
+| **Almacenamiento** | `DataStore<Preferences>` con `byteArrayPreferencesKey` — Flow-based, coroutine-native |
+| **Configuración** | `AndroidStoreConfig` — nombre de DataStore, alias de clave en KeyStore, prefijo de clave |
+| **Estado** | ✅ Completamente implementado. Requiere `androidx.datastore:datastore-preferences`. |
 
 ### iOS: `IosSecretStore`
 
@@ -471,7 +471,7 @@ class ProductionTrustPolicy : TrustPolicy {
 
 | Ítem | Ubicación | Descripción |
 |---|---|---|
-| ✅ `AndroidSecretStore` | `androidMain/store/` | EncryptedSharedPreferences + MasterKey + AES-256-GCM + mapeo de errores |
+| ✅ `AndroidSecretStore` | `androidMain/store/` | DataStore + Cipher(AES/GCM/NoPadding) + Android Keystore + mapeo de errores |
 | ✅ `IosSecretStore` | `iosMain/store/` | Keychain Services (`SecItem*` APIs) con manejo de errores OSStatus |
 | ✅ `DefaultSessionController` | `session/` | StateFlow, persistencia de tokens, refresh, invalidate, endSession |
 | ✅ `DefaultCredentialProvider` | `credential/` | Respaldado por `SessionController` — `current()`, `refresh()`, `invalidate()` |
@@ -494,7 +494,7 @@ class ProductionTrustPolicy : TrustPolicy {
 ### Maven Central
 
 ```kotlin
-implementation("io.github.dancrrdz93:security-core:0.1.0")
+implementation("io.github.dancrrdz93:security-core:0.2.0")
 ```
 
 ### Dependencia transitiva

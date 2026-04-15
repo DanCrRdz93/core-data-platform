@@ -1,6 +1,6 @@
 # Core Data Platform
 
-![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Version](https://img.shields.io/badge/version-0.2.0-blue)
 ![Maven Central](https://img.shields.io/maven-central/v/io.github.dancrrdz93/network-core)
 
 **SDK Kotlin Multiplatform para Acceso Remoto Seguro de Datos**
@@ -18,19 +18,9 @@ Una librería Kotlin Multiplatform (KMP) reutilizable y modular diseñada para p
 - [Objetivos del Proyecto](#objetivos-del-proyecto)
 - [Arquitectura](#arquitectura)
 - [Estructura de Módulos](#estructura-de-módulos)
-- [Estructura de Carpetas](#estructura-de-carpetas)
-- [Estrategia KMP](#estrategia-kmp)
 - [Requisitos](#requisitos)
-- [Guía de Uso](#guía-de-uso)
-- [Flujo de Ejecución de Requests](#flujo-de-ejecución-de-requests)
-- [Manejo de Errores](#manejo-de-errores)
-- [Seguridad](#seguridad)
-- [Extensibilidad](#extensibilidad)
-- [Buenas Prácticas](#buenas-prácticas)
-- [Decisiones de Diseño](#decisiones-de-diseño)
-- [Diagramas](#diagramas)
-- [Ejemplo de Integración](#ejemplo-de-integración)
 - [Roadmap](#roadmap)
+- [Seguridad — OWASP MASVS](#seguridad--owasp-masvs)
 - [Reglas de Diseño](#reglas-de-diseño)
 
 ---
@@ -39,10 +29,10 @@ Una librería Kotlin Multiplatform (KMP) reutilizable y modular diseñada para p
 
 ### Guías
 
-- [Guía de Integración](docs/integration-guide.md) — Cómo agregar el SDK como dependencia y conectar módulos de dominio
-- [Guía Rápida para Android](docs/android-quickstart.md) — Primeros pasos para desarrolladores Android con Clean Architecture
-- [Guía Rápida para iOS](docs/ios-quickstart.md) — Primeros pasos para desarrolladores iOS con Clean Architecture
-- [Integración con Clean Architecture](docs/clean-architecture-integration.md) — Cómo usar el SDK en la capa `data` de un proyecto con Clean Architecture
+- [Guía de Integración](docs/integration-guide.md) — Paso a paso completo: dependencias, configuración, capa data (todos los métodos HTTP, paginación, filtros, body JSON, 204 No Content), consumo de resultados, RequestContext, ResponseInterceptor, autenticación (simple y con sesión completa), certificate pinning, observabilidad, multi-entorno, y manejo de errores — todo con escenarios de negocio explicados
+- [Guía Rápida para Android](docs/android-quickstart.md) — Primeros pasos para desarrolladores Android: contrato, adapter, DI (Hilt/Koin), NetworkResult, errores, auth, config, logging, paginación, retry por endpoint, y FAQ de seguridad
+- [Guía Rápida para iOS](docs/ios-quickstart.md) — Primeros pasos para desarrolladores iOS: protocolo, adapter, DI, NetworkResult, errores, auth, config, logging, paginación, retry por endpoint, y FAQ de seguridad
+- [Integración con Clean Architecture](docs/clean-architecture-integration.md) — Cómo usar el SDK exclusivamente en la capa `data`: estructura de carpetas, DTOs vs modelos de dominio, DataSource, Repository, DI, y referencias a escenarios avanzados
 
 ### READMEs de Módulos
 
@@ -94,7 +84,7 @@ result.fold(
 
 > `SampleApiFactory.create()` ensambla internamente todo el pipeline: configuración → engine HTTP → executor con reintentos → data source → repository. Tú solo interactúas con `UserRepository` y `NetworkResult<User>`.
 
-Para configuración avanzada (auth, timeouts personalizados, interceptors), consulta la [Guía de Uso](#guía-de-uso) o la [Guía de Integración](docs/integration-guide.md).
+Para configuración avanzada (auth, timeouts personalizados, interceptors), consulta la [Guía de Integración](docs/integration-guide.md) o las guías rápidas para [Android](docs/android-quickstart.md) / [iOS](docs/ios-quickstart.md).
 
 ---
 
@@ -109,16 +99,16 @@ repositories {
 
 dependencies {
     // Contratos core (siempre requeridos)
-    implementation("io.github.dancrrdz93:network-core:0.1.0")
+    implementation("io.github.dancrrdz93:network-core:0.2.0")
 
     // Implementación de transporte HTTP (elige uno)
-    implementation("io.github.dancrrdz93:network-ktor:0.1.0")
+    implementation("io.github.dancrrdz93:network-ktor:0.2.0")
 
     // Seguridad (auth, almacenamiento seguro, gestión de sesiones)
-    implementation("io.github.dancrrdz93:security-core:0.1.0")
+    implementation("io.github.dancrrdz93:security-core:0.2.0")
 
     // Módulo de referencia (opcional — para ver el patrón de integración)
-    implementation("io.github.dancrrdz93:sample-api:0.1.0")
+    implementation("io.github.dancrrdz93:sample-api:0.2.0")
 }
 ```
 
@@ -225,7 +215,7 @@ Los módulos del SDK se sitúan en la parte inferior del grafo de dependencias. 
 | **`:sample-api`** | Módulo piloto de referencia: demuestra el patrón DTO → Mapper → DataSource → Repository → Factory | `UserDto`, `User`, `UserMapper`, `UserRemoteDataSource`, `UserRepository`, `SampleApiFactory` | `:network-core`, `:network-ktor`, `:security-core`, `kotlinx-serialization-json` |
 
 **Implementaciones de plataforma en `:security-core`:**
-- `AndroidSecretStore` — EncryptedSharedPreferences + Android Keystore (AES-256-GCM)
+- `AndroidSecretStore` — DataStore + Cipher(AES/GCM/NoPadding) + Android Keystore
 - `IosSecretStore` — Keychain Services (`kSecClassGenericPassword`)
 - `DefaultSessionController` — Gestión de sesión con `StateFlow`, persistencia en `SecretStore`, refresh configurable
 - `DefaultCredentialProvider` — Lee credencial activa desde `SessionController.state`
@@ -251,132 +241,7 @@ Los módulos del SDK se sitúan en la parte inferior del grafo de dependencias. 
 
 ---
 
-## Estructura de Carpetas
-
-```
-core-data-platform/
-├── build.gradle.kts                          # Build raíz — declaraciones de plugins
-├── settings.gradle.kts                       # Registro de módulos
-├── gradle/libs.versions.toml                 # Catálogo de versiones centralizado
-│
-├── network-core/                             # Abstracciones puras de red
-│   └── src/commonMain/kotlin/com/dancr/platform/network/
-│       ├── client/
-│       │   ├── HttpEngine.kt                 # Abstracción de transporte
-│       │   ├── HttpMethod.kt                 # GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
-│       │   ├── HttpRequest.kt                # Modelo de request (path, method, headers, query, body)
-│       │   └── RawResponse.kt                # Modelo de respuesta (statusCode, headers, body)
-│       ├── config/
-│       │   ├── NetworkConfig.kt              # URL base, timeouts, headers por defecto, política de reintentos
-│       │   └── RetryPolicy.kt               # None, FixedDelay, ExponentialBackoff
-│       ├── datasource/
-│       │   └── RemoteDataSource.kt           # Base abstracta para todos los data sources remotos
-│       ├── execution/
-│       │   ├── SafeRequestExecutor.kt        # Interfaz del pipeline de ejecución
-│       │   ├── DefaultSafeRequestExecutor.kt # Pipeline completo: preparar → interceptar → reintentar → validar → deserializar
-│       │   ├── RequestInterceptor.kt         # Hook pre-request (auth, headers, tracing)
-│       │   ├── ResponseInterceptor.kt        # Hook post-respuesta (logging, caching, métricas)
-│       │   ├── ErrorClassifier.kt            # Interfaz de mapeo excepción/respuesta → NetworkError
-│       │   ├── DefaultErrorClassifier.kt     # Clasificador heurístico (open para extensión)
-│       │   ├── ResponseValidator.kt          # Contrato de validación de respuesta + ValidationOutcome
-│       │   ├── DefaultResponseValidator.kt   # Por defecto: 2xx = válido
-│       │   └── RequestContext.kt             # Metadata por request (operationId, tags, tracing)
-│       ├── observability/
-│       │   ├── NetworkEventObserver.kt       # Callbacks de ciclo de vida para métricas/tracing/logging
-│       │   ├── NetworkLogger.kt              # fun interface — abstracción de logging (NOOP por defecto)
-│       │   ├── LoggingObserver.kt            # Observer que registra requests/responses vía NetworkLogger
-│       │   ├── MetricsCollector.kt           # Interfaz — abstracción de métricas (NOOP por defecto)
-│       │   ├── MetricsObserver.kt            # Observer que registra latencia, errores, retries
-│       │   ├── TracingBackend.kt             # Interfaz — abstracción de tracing (NOOP por defecto)
-│       │   └── TracingObserver.kt            # Observer que genera span/trace IDs
-│       └── result/
-│           ├── NetworkResult.kt              # Success<T> | Failure — con map, fold, flatMap
-│           ├── NetworkError.kt               # Taxonomía de errores semánticos (sealed class)
-│           ├── Diagnostic.kt                 # Detalles internos de error (description, cause, metadata)
-│           └── ResponseMetadata.kt           # Código de estado, headers, duración, número de intentos
-│
-├── network-ktor/                             # Adaptador de transporte Ktor
-│   └── src/
-│       ├── commonMain/kotlin/com/dancr/platform/network/ktor/
-│       │   ├── KtorHttpEngine.kt             # Implementación de HttpEngine sobre Ktor HttpClient
-│       │   ├── KtorErrorClassifier.kt        # Clasificación de errores consciente de Ktor
-│       │   └── PlatformHttpClient.kt         # expect fun — crea HttpClient con TLS por plataforma
-│       ├── androidMain/kotlin/com/dancr/platform/network/ktor/
-│       │   └── PlatformHttpClient.android.kt # actual — OkHttp + CertificatePinner
-│       └── iosMain/kotlin/com/dancr/platform/network/ktor/
-│           └── PlatformHttpClient.ios.kt     # actual — Darwin + handleChallenge + SecTrust
-│
-├── security-core/                            # Abstracciones de seguridad
-│   └── src/
-│       ├── commonMain/kotlin/com/dancr/platform/security/
-│       │   ├── config/
-│       │   │   └── SecurityConfig.kt         # Headers/claves sensibles, placeholder de redacción
-│       │   ├── credential/
-│       │   │   ├── Credential.kt             # Sealed interface: Bearer, ApiKey, Basic, Custom
-│       │   │   ├── CredentialProvider.kt     # Provee la credencial activa para requests
-│       │   │   └── CredentialHeaderMapper.kt # Credential → mapa de headers HTTP (sin dependencia de red)
-│       │   ├── error/
-│       │   │   ├── SecurityError.kt          # Errores de seguridad semánticos (sealed class)
-│       │   │   └── Diagnostic.kt             # Detalles internos de error
-│       │   ├── sanitizer/
-│       │   │   ├── LogSanitizer.kt           # Interfaz de redacción de valores por clave
-│       │   │   └── DefaultLogSanitizer.kt    # Redacta headers sensibles y claves de body
-│       │   ├── session/
-│       │   │   ├── SessionController.kt      # Contrato de ciclo de vida de sesión (basado en StateFlow)
-│       │   │   ├── SessionState.kt           # Idle | Active(credential) | Expired
-│       │   │   ├── SessionCredentials.kt     # Credential + refresh token + expiry
-│       │   │   └── SessionEvent.kt           # Started, Refreshed, Expired, Ended, RefreshFailed
-│       │   ├── store/
-│       │   │   └── SecretStore.kt            # Interfaz de almacenamiento seguro clave-valor
-│       │   ├── trust/
-│       │   │   ├── TrustPolicy.kt            # Interfaz de evaluación de host + certificate pinning
-│       │   │   ├── TrustEvaluation.kt        # Trusted | Denied(reason)
-│       │   │   ├── CertificatePin.kt         # Par algoritmo + hash
-│       │   │   └── DefaultTrustPolicy.kt     # Default que confía en todo (sobreescribir en producción)
-│       │   └── util/
-│       │       └── Base64.kt                 # Codificación Base64 cross-platform
-│       ├── androidMain/kotlin/com/dancr/platform/security/store/
-│       │   ├── AndroidSecretStore.kt         # Impl de SecretStore (skeleton — EncryptedSharedPreferences)
-│       │   └── AndroidStoreConfig.kt         # Configuración de almacenamiento específica de Android
-│       └── iosMain/kotlin/com/dancr/platform/security/store/
-│           ├── IosSecretStore.kt             # Impl de SecretStore (skeleton — Keychain Services)
-│           └── KeychainConfig.kt             # Configuración de Keychain específica de iOS
-│
-└── sample-api/                               # Módulo piloto de referencia
-    └── src/commonMain/kotlin/com/dancr/platform/sample/
-        ├── dto/UserDto.kt                    # Modelo técnico (@Serializable)
-        ├── model/User.kt                     # Modelo de dominio público (limpio)
-        ├── mapper/UserMapper.kt              # DTO → Dominio
-        ├── datasource/UserRemoteDataSource.kt # Extiende RemoteDataSource
-        ├── repository/UserRepository.kt      # Capa de mapeo de dominio
-        └── di/SampleApiFactory.kt            # Ejemplo de cableado completo
-```
-
----
-
-## Estrategia KMP
-
-### Qué va dónde
-
-| Source Set    | Contenido | Razón |
-|---------------|---|---|
-| `commonMain`  | Todas las interfaces, contratos, sealed classes, data classes, implementaciones por defecto, pipeline de ejecución, modelo de errores | Compartido entre todas las plataformas. Aquí vive el 95%+ de la lógica del SDK. |
-| `androidMain` | `AndroidSecretStore`, `AndroidStoreConfig` | Usa APIs específicas de Android: `EncryptedSharedPreferences`, `android.content.Context`, Android Keystore. |
-| `iosMain`     | `IosSecretStore`, `KeychainConfig` | Usa APIs específicas de iOS: Keychain Services (`SecItemAdd`, `SecItemCopyMatching`), `kSecAttrAccessible`. |
-
-### ¿Por qué esta división?
-
-El objetivo es **maximizar la superficie común** y empujar el código específico de plataforma a los bordes absolutos:
-
-- **Lógica de negocio** — siempre en `commonMain`. Sin excepciones.
-- **Data classes de configuración** — siempre en `commonMain`.
-- **I/O de plataforma** — solo en source sets de plataforma (`androidMain`, `iosMain`).
-- **Engines de transporte** — Ktor auto-selecciona el engine de plataforma (OkHttp en Android, Darwin en iOS) vía resolución de dependencias Gradle en `:network-ktor`. No se necesitan source sets de plataforma en el módulo de transporte.
-
-Esto significa que agregar una nueva funcionalidad de seguridad (ej. autenticación biométrica) solo requiere:
-1. Definir la interfaz en `commonMain`.
-2. Implementar en `androidMain` (BiometricPrompt) e `iosMain` (LAContext).
-3. Sin cambios en `network-core` ni en ningún módulo de dominio.
+El 95%+ del código vive en `commonMain`. Solo `SecretStore` (Android Keystore / iOS Keychain) y los engines de transporte HTTP (OkHttp / Darwin) requieren source sets de plataforma. Para más detalle, consulta la [Estrategia KMP](docs/diagrams/04-kmp-strategy.md).
 
 ---
 
@@ -405,635 +270,21 @@ Esto significa que agregar una nueva funcionalidad de seguridad (ej. autenticaci
 
 ---
 
-## Guía de Uso
+Para guías detalladas de integración, configuración y uso:
 
-### 1. Agrega módulos a tu proyecto
+- **Android →** [Guía Rápida para Android](docs/android-quickstart.md)
+- **iOS →** [Guía Rápida para iOS](docs/ios-quickstart.md)
+- **Integración paso a paso →** [Guía de Integración](docs/integration-guide.md)
+- **Clean Architecture →** [Integración con Clean Architecture](docs/clean-architecture-integration.md)
 
-En el `build.gradle.kts` de tu app:
+Para detalles técnicos de cada módulo (contratos, decisiones de diseño, extensibilidad, manejo de errores, seguridad):
 
-```kotlin
-dependencies {
-    // Contratos core (siempre requeridos)
-    implementation("io.github.dancrrdz93:network-core:0.1.0")
+- [network-core](network-core/README.md) — Pipeline de ejecución, errores, observabilidad
+- [network-ktor](network-ktor/README.md) — Transporte HTTP, certificate pinning
+- [security-core](security-core/README.md) — Credenciales, sesiones, almacenamiento seguro, TrustPolicy
+- [sample-api](sample-api/README.md) — Módulo de referencia
 
-    // Implementación de transporte (elige uno)
-    implementation("io.github.dancrrdz93:network-ktor:0.1.0")
-
-    // Seguridad (si necesitas auth, almacenamiento seguro o gestión de sesiones)
-    implementation("io.github.dancrrdz93:security-core:0.1.0")
-
-    // Serialización (en tus módulos de dominio)
-    implementation(libs.kotlinx.serialization.json)
-}
-```
-
-> Si el SDK es un módulo local de tu proyecto, usa `implementation(project(":network-core"))` en su lugar.
-
-### 2. Define tu configuración
-
-```kotlin
-val config = NetworkConfig(
-    baseUrl = "https://api.yourcompany.com",
-    defaultHeaders = mapOf(
-        "Accept" to "application/json",
-        "X-App-Version" to "1.0.0"
-    ),
-    connectTimeout = 15.seconds,
-    readTimeout = 30.seconds,
-    retryPolicy = RetryPolicy.ExponentialBackoff(
-        maxRetries = 3,
-        initialDelay = 1.seconds,
-        maxDelay = 15.seconds
-    )
-)
-```
-
-### 3. Crea el pipeline de ejecución
-
-```kotlin
-val engine = KtorHttpEngine.create(config)
-
-val executor = DefaultSafeRequestExecutor(
-    engine = engine,
-    config = config,
-    classifier = KtorErrorClassifier(),
-    interceptors = listOf(myAuthInterceptor),
-    responseInterceptors = listOf(myLoggingInterceptor),
-    observers = listOf(myMetricsObserver)
-)
-```
-
-### 4. Construye tu data source
-
-```kotlin
-class OrderRemoteDataSource(
-    executor: SafeRequestExecutor
-) : RemoteDataSource(executor) {
-
-    private val json = Json { ignoreUnknownKeys = true }
-
-    suspend fun fetchOrders(): NetworkResult<List<OrderDto>> = execute(
-        request = HttpRequest(path = "/orders", method = HttpMethod.GET),
-        deserialize = { response ->
-            json.decodeFromString(response.body!!.decodeToString())
-        }
-    )
-}
-```
-
-### 5. Consume resultados en tu UI/ViewModel
-
-```kotlin
-repository.getOrders().fold(
-    onSuccess = { orders -> /* List<Order> — clean domain models */ },
-    onFailure = { error -> showError(error.message) }
-)
-```
-
-Tu ViewModel nunca importa Ktor. Nunca ve `RawResponse`. Nunca maneja reintentos.
-
----
-
-## Flujo de Ejecución de Requests
-
-```mermaid
-sequenceDiagram
-    participant C as Consumer
-    participant R as Repository
-    participant DS as DataSource
-    participant E as Executor
-    participant RI as Request<br/>Interceptors
-    participant H as HttpEngine
-    participant RsI as Response<br/>Interceptors
-    participant V as Validator
-    participant CL as Classifier
-
-    C->>R: getUsers()
-    R->>DS: fetchUsers()
-    DS->>E: execute(HttpRequest, deserialize)
-
-    rect rgb(245, 245, 245)
-        Note over E,RI: ① Pre-transport
-        E->>RI: intercept(request, context)
-        RI-->>E: Modified HttpRequest
-    end
-
-    rect rgb(240, 248, 255)
-        Note over E,H: ② Transport
-        E->>H: execute(request)
-        H-->>E: RawResponse
-    end
-
-    rect rgb(245, 245, 245)
-        Note over E,RsI: ③ Post-transport
-        E->>RsI: intercept(response, request)
-        RsI-->>E: RawResponse
-    end
-
-    rect rgb(255, 243, 224)
-        Note over E,CL: ④ Validate & Classify
-        E->>V: validate(response)
-        alt Valid (2xx)
-            V-->>E: Valid
-            E->>E: deserialize(response) → T
-            E-->>DS: Success(data, metadata)
-        else Invalid (non-2xx)
-            V-->>E: Invalid
-            E->>CL: classify(response)
-            CL-->>E: NetworkError
-            E-->>DS: Failure(error)
-        end
-    end
-
-    DS-->>R: NetworkResult&lt;UserDto&gt;
-    R->>R: .map(UserMapper::toDomain)
-    R-->>C: NetworkResult&lt;User&gt;
-```
-
-**Resumen del pipeline:** El executor prepara la request (headers por defecto + interceptors), la envía vía `HttpEngine`, ejecuta interceptors de respuesta, valida el status code y deserializa. Si falla con un error retryable (`Connectivity`, `Timeout`, `ServerError`), reintenta según la `RetryPolicy` configurada. El resultado final es siempre un `NetworkResult<T>` — el consumidor nunca ve `RawResponse`, `HttpEngine`, ni tipos de Ktor.
-
----
-
-## Manejo de Errores
-
-### El Modelo de Resultado
-
-Cada operación retorna `NetworkResult<T>`, una sealed class:
-
-```kotlin
-sealed class NetworkResult<out T> {
-    data class Success<T>(val data: T, val metadata: ResponseMetadata)
-    data class Failure(val error: NetworkError)
-}
-```
-
-Los consumidores usan un API rico para manejar resultados:
-
-| Método | Propósito |
-|---|---|
-| `.fold(onSuccess, onFailure)` | Manejo exhaustivo |
-| `.map { transform }` | Transformar datos de éxito, preservando metadata |
-| `.flatMap { transform }` | Encadenar operaciones dependientes |
-| `.onSuccess { }` / `.onFailure { }` | Efectos secundarios |
-| `.getOrNull()` / `.errorOrNull()` | Extracción nullable |
-
-### Taxonomía de Errores
-
-`NetworkError` es una sealed class organizada por capa:
-
-| Capa | Error | `isRetryable` | Mensaje Público |
-|---|---|---|---|
-| **Transporte** | `Connectivity` | ✅ | "Unable to reach the server" |
-| | `Timeout` | ✅ | "The request timed out" |
-| | `Cancelled` | ❌ | "The request was cancelled" |
-| **Semántica HTTP** | `Authentication` | ❌ | "Authentication required" |
-| | `Authorization` | ❌ | "Access denied" |
-| | `ClientError(statusCode)` | ❌ | "Invalid request" |
-| | `ServerError(statusCode)` | ✅ | "Server error" |
-| **Procesamiento de Datos** | `Serialization` | ❌ | "Failed to process response data" |
-| | `ResponseValidation(reason)` | ❌ | "Response validation failed" |
-| **Catch-all** | `Unknown` | ❌ | "An unexpected error occurred" |
-
-### Dos audiencias, un modelo
-
-- **`error.message`** — Seguro para usuarios finales. Nunca expone detalles técnicos.
-- **`error.diagnostic`** — Para desarrolladores y logging. Contiene `description`, `cause` (Throwable), y `metadata` (Map). Nunca se muestra a usuarios.
-
-```kotlin
-result.onFailure { error ->
-    // Para UI
-    showToast(error.message)
-
-    // Para logging (solo interno)
-    logger.error(error.diagnostic?.description, error.diagnostic?.cause)
-}
-```
-
----
-
-## Seguridad
-
-### Vista General de Arquitectura
-
-`security-core` provee abstracciones para cinco preocupaciones de seguridad. Todos los contratos están en `commonMain`; las implementaciones específicas de plataforma están en `androidMain`/`iosMain`.
-
-### 1. Gestión de Credenciales
-
-```kotlin
-sealed interface Credential {
-    data class Bearer(val token: String)
-    data class ApiKey(val key: String, val headerName: String = "X-API-Key")
-    data class Basic(val username: String, val password: String)
-    data class Custom(val type: String, val properties: Map<String, String>)
-}
-```
-
-`CredentialProvider` provee la credencial actual y soporta refresh proactivo e invalidación:
-
-```kotlin
-interface CredentialProvider {
-    suspend fun current(): Credential?          // Credential activa, o null si no hay sesión
-    suspend fun refresh(): Credential?          // Refresh proactivo. Default: delega a current()
-    suspend fun invalidate()                    // Limpiar credential en 401. Default: no-op
-}
-```
-
-`DefaultCredentialProvider` delega `refresh()` a `SessionController.refreshSession()` e `invalidate()` a `SessionController.invalidate()`.
-
-`CredentialHeaderMapper` convierte cualquier `Credential` en headers HTTP sin importar ningún tipo de red:
-
-```kotlin
-val headers: Map<String, String> = CredentialHeaderMapper.toHeaders(credential)
-// Bearer → {"Authorization": "Bearer <token>"}
-// ApiKey → {"X-API-Key": "<key>"}
-// Basic → {"Authorization": "Basic <base64>"}
-```
-
-### 2. Ciclo de Vida de Sesión
-
-`SessionController` gestiona el ciclo de vida completo de autenticación con estado reactivo:
-
-```kotlin
-interface SessionController {
-    val state: StateFlow<SessionState>       // Idle | Active(credential) | Expired
-    val events: Flow<SessionEvent>           // Started, Refreshed, Expired, Ended, Invalidated, RefreshFailed
-    val isAuthenticated: Boolean             // Derived from state — true only when Active
-    suspend fun startSession(credentials: SessionCredentials)
-    suspend fun refreshSession(): RefreshOutcome  // Refreshed | NotNeeded | Failed
-    suspend fun endSession()
-    suspend fun invalidate()                 // Force-logout (e.g. on 401)
-}
-```
-
-`RefreshOutcome` es un resultado sealed que distingue claramente qué pasó:
-- **`Refreshed(credential)`** — Se obtuvo una nueva credencial. Sesión activa.
-- **`NotNeeded(reason)`** — No se intentó el refresh (ej. no hay refresh token o no hay provider). El estado actual no cambia.
-- **`Failed(error)`** — Se intentó el refresh pero falló. La sesión transiciona a Expired.
-
-`invalidate()` vs `endSession()`: ambos limpian credenciales y transicionan a Idle. La diferencia es semántica — `endSession()` es logout intencional del usuario, `invalidate()` es forzado externamente (ej. 401, política de seguridad). Emiten eventos diferentes (`Ended` vs `Invalidated`).
-
-> **Estado:** Implementación disponible: `DefaultSessionController` — gestiona estado con `StateFlow`, persiste tokens en `SecretStore`, soporta refresh configurable vía lambda.
-
-### 3. Almacenamiento Seguro
-
-`SecretStore` provee almacenamiento seguro clave-valor de plataforma:
-
-```kotlin
-interface SecretStore {
-    suspend fun putString(key: String, value: String)
-    suspend fun getString(key: String): String?
-    suspend fun putBytes(key: String, value: ByteArray)
-    suspend fun getBytes(key: String): ByteArray?
-    suspend fun remove(key: String)
-    suspend fun clear()
-    suspend fun contains(key: String): Boolean
-}
-```
-
-| Plataforma | Implementación | Backend | Estado |
-|---|---|---|---|
-| Android | `AndroidSecretStore` | EncryptedSharedPreferences + Android Keystore (AES-256-GCM) | ✅ Implementado |
-| iOS | `IosSecretStore` | Keychain Services (`kSecClassGenericPassword`) | ✅ Implementado |
-
-### 4. Política de Confianza
-
-```kotlin
-interface TrustPolicy {
-    fun evaluateHost(hostname: String): TrustEvaluation  // Trusted | Denied(reason)
-    fun pinnedCertificates(): Map<String, Set<CertificatePin>>
-}
-```
-
-`DefaultTrustPolicy` confía en todos los hosts (default de desarrollo). Las apps de producción sobreescriben con conjuntos de pines específicos de dominio.
-
-> **Estado:** ✅ Completamente implementado. `KtorHttpEngine.create(config, trustPolicy)` acepta `TrustPolicy` y configura certificate pinning vía `CertificatePinner` (Android/OkHttp) y `SecTrust` (iOS/Darwin).
-
-### 5. Sanitización de Logs
-
-```kotlin
-interface LogSanitizer {
-    fun sanitize(key: String, value: String): String
-}
-```
-
-`DefaultLogSanitizer` redacta valores para claves que coincidan con `SecurityConfig.sensitiveHeaders` (ej. `authorization`, `cookie`) y `SecurityConfig.sensitiveKeys` (ej. `password`, `token`, `api_key`).
-
----
-
-## Extensibilidad
-
-### Agregar un nuevo módulo de dominio API
-
-Sigue el patrón establecido por `:sample-api`:
-
-1. Crea un nuevo módulo (ej. `:payments-api`).
-2. Depende de `:network-core`, `:network-ktor`, `:security-core`.
-3. Crea tus capas:
-   - `dto/` — Modelos `@Serializable` que coinciden con la respuesta del API
-   - `model/` — Modelos de dominio limpios (sin anotaciones)
-   - `mapper/` — Conversión DTO → Dominio
-   - `datasource/` — Extiende `RemoteDataSource`
-   - `repository/` — Mapea `NetworkResult<Dto>` → `NetworkResult<Model>`
-   - `di/` — Cableado de factory
-
-**No se requieren cambios en módulos core.**
-
-### Agregar un nuevo engine de transporte
-
-Implementa `HttpEngine` en un nuevo módulo (ej. `:network-okhttp`):
-
-```kotlin
-class OkHttpEngine(private val client: OkHttpClient) : HttpEngine {
-    override suspend fun execute(request: HttpRequest): RawResponse { /* ... */ }
-    override fun close() { client.dispatcher.executorService.shutdown() }
-}
-```
-
-Extiende `DefaultErrorClassifier` para matching de excepciones type-safe:
-
-```kotlin
-class OkHttpErrorClassifier : DefaultErrorClassifier() {
-    override fun classifyThrowable(cause: Throwable): NetworkError = when (cause) {
-        is SocketTimeoutException -> NetworkError.Timeout(/* ... */)
-        else -> super.classifyThrowable(cause)
-    }
-}
-```
-
-### Agregar logging
-
-El SDK incluye `LoggingObserver` + `NetworkLogger` listos para usar. **Por defecto no imprime nada** — el backend de logging lo define el consumidor:
-
-```kotlin
-import com.dancr.platform.network.observability.LoggingObserver
-import com.dancr.platform.network.observability.NetworkLogger
-
-// Conecta tu backend de logging (Timber, Logcat, os_log, etc.)
-val logger = NetworkLogger { level, tag, message ->
-    when (level) {
-        NetworkLogger.Level.DEBUG -> Log.d(tag, message)
-        NetworkLogger.Level.INFO  -> Log.i(tag, message)
-        NetworkLogger.Level.WARN  -> Log.w(tag, message)
-        NetworkLogger.Level.ERROR -> Log.e(tag, message)
-    }
-}
-
-val loggingObserver = LoggingObserver(
-    logger = logger,
-    // Conecta DefaultLogSanitizer para redactar headers sensibles
-    headerSanitizer = { key, value -> logSanitizer.sanitize(key, value) }
-)
-```
-
-> **Importante:** Siempre sanitiza headers en producción. Los observers son solo para observabilidad — nunca para lógica de negocio.
-
-### Agregar observabilidad personalizada
-
-Implementa `NetworkEventObserver` — solo sobreescribe los callbacks que necesites:
-
-```kotlin
-class MetricsObserver(private val metrics: MetricsClient) : NetworkEventObserver {
-    override fun onResponseReceived(request: HttpRequest, response: RawResponse, durationMs: Long, context: RequestContext?) {
-        metrics.recordLatency("http.request.duration", durationMs, tags = mapOf("path" to request.path))
-    }
-    override fun onRequestFailed(request: HttpRequest, error: NetworkError, durationMs: Long, context: RequestContext?) {
-        metrics.increment("http.request.error", tags = mapOf("type" to error::class.simpleName.orEmpty()))
-    }
-}
-```
-
-Combina múltiples observers:
-
-```kotlin
-DefaultSafeRequestExecutor(
-    engine = engine,
-    config = config,
-    observers = listOf(loggingObserver, MetricsObserver(myMetricsClient))
-)
-```
-
-### Agregar interceptors de respuesta
-
-Implementa `ResponseInterceptor` para procesamiento post-transporte:
-
-```kotlin
-val loggingInterceptor = ResponseInterceptor { response, request, context ->
-    logger.info("${request.method} ${request.path} → ${response.statusCode}")
-    response  // return unmodified, or transform as needed
-}
-```
-
-### Agregar comportamiento de reintento personalizado
-
-`NetworkError.isRetryable` es un `open val`. El `DefaultErrorClassifier` retorna tipos de error estándar con reintentabilidad incorporada. Para personalizar, crea un `ErrorClassifier` que retorne errores con características de reintentabilidad diferentes, o extiende `DefaultErrorClassifier` y sobreescribe `classifyResponse`/`classifyThrowable`.
-
----
-
-## Buenas Prácticas
-
-### Hacer
-
-- **Usa `RemoteDataSource`** como base para todos los data sources. Fuerza el pipeline de `SafeRequestExecutor`.
-- **Separa DTOs de modelos de dominio.** Los DTOs coinciden con el contrato del API; los modelos de dominio coinciden con el vocabulario de tu app.
-- **Inyecta `SafeRequestExecutor`** — nunca `DefaultSafeRequestExecutor` directamente. Programa contra la interfaz.
-- **Usa `RequestContext`** para metadata por request (IDs de operación, spans de tracing, flags de auth).
-- **Maneja `NetworkResult` exhaustivamente** con `.fold()` — nunca ignores la rama de fallo.
-- **Mantén los mappers puros.** `UserMapper.toDomain(dto)` debe ser una función sin estado y sin efectos secundarios.
-- **Testea con mock de `HttpEngine`.** La interfaz es trivial de mockear — retorna un `RawResponse` con el código de estado y body que quieras.
-
-### No hacer
-
-- **No importes tipos de Ktor en módulos de dominio.** Si ves `io.ktor` en un data source o repository, la abstracción está fugando.
-- **No captures `NetworkResult.Failure` como excepción.** Es un valor, no un error lanzado. Usa `.fold()` o `.onFailure()`.
-- **No pongas lógica de negocio en interceptors.** Los interceptors son para infraestructura transversal (auth, logging, tracing). La validación de negocio pertenece al repository o la capa de dominio.
-- **No crees una instancia de `Json` por request.** Créala una vez en el data source y reúsala.
-- **No expongas `Diagnostic` a usuarios finales.** Contiene información interna de debugging (`Throwable`, contexto de stack). Muestra `error.message` a usuarios.
-- **No dependas de `network-core` desde `security-core`** (ni viceversa). Esta invariante preserva la independencia de módulos.
-- **No hardcodees URLs base en data sources.** Pásalas vía `NetworkConfig` a nivel de cableado.
-
-### Errores comunes de integración
-
-| Error | Solución |
-|---|---|
-| Usar `response.body!!` sin contexto de error | Envuelve en `try` o verifica null con un error descriptivo |
-| Crear un nuevo `KtorHttpEngine` por request | Crea uno, compártelo entre data sources vía el executor |
-| Olvidar llamar `engine.close()` | Usa la gestión de ciclo de vida del engine en tu framework de DI |
-| Poner la configuración de `Json` en `commonMain` de un módulo core | Mantén la serialización en módulos de dominio — los módulos core son agnósticos de serialización |
-
----
-
-## Decisiones de Diseño
-
-| Decisión | Razón |
-|---|---|
-| **`expectSuccess = false` en Ktor** | Por defecto, Ktor lanza excepciones en HTTP 4xx/5xx. Desactivamos esto para que **todas** las respuestas (incluidos errores HTTP) fluyan como valores a través de `ResponseValidator` → `ErrorClassifier` → `NetworkError`. Esto garantiza un modelo de errores unificado sin try-catch dispersos. |
-| **`ByteArray` como tipo de body en `HttpRequest` y `RawResponse`** | Es el tipo más primitivo y agnóstico de serialización. El SDK no asume JSON, Protobuf ni ningún formato específico. Cada módulo de dominio decide cómo serializar/deserializar en su lambda `deserialize`. Esto mantiene `:network-core` libre de dependencias de serialización. |
-| **Separación `:network-core` / `:security-core`** | Abordan preocupaciones ortogonales: transporte HTTP vs. gestión de secretos. Un módulo que solo necesita almacenamiento seguro no arrastra dependencias de red (y viceversa). Se integran únicamente en el punto de consumo vía `CredentialHeaderMapper`, que retorna un `Map<String, String>` — sin tipos de red. Ver [ADR-001](docs/adr/ADR-001-separation-network-core-security-core.md). |
-| **Errores como valores (`NetworkResult`), no excepciones** | `NetworkResult.Failure` envuelve `NetworkError` con semántica clara (`isRetryable`, `message` público, `diagnostic` interno). El consumidor usa `.fold()` para manejo exhaustivo en vez de try-catch. Ver [ADR-006](docs/adr/ADR-006-centralized-error-classification.md). |
-| **Pipeline centralizado en `DefaultSafeRequestExecutor`** | Toda request pasa por el mismo flujo: interceptar → transportar → validar → clasificar → reintentar → deserializar. Esto evita que cada data source reimplemente lógica de reintentos o manejo de errores. Ver [ADR-005](docs/adr/ADR-005-centralized-safe-execution-pipeline.md). |
-
----
-
-## Diagramas
-
-### Grafo de Dependencias de Módulos
-
-```mermaid
-graph LR
-    APP[":app"]
-    SA[":sample-api"]
-
-    subgraph SDK["SDK Modules"]
-        direction TB
-        NK[":network-ktor"]
-        NC[":network-core"]
-        SC[":security-core"]
-    end
-
-    APP --> SA
-    APP --> NK
-    APP --> SC
-
-    SA --> NC
-    SA --> NK
-    SA --> SC
-
-    NK --> NC
-    NK -.-> SC
-
-    style SDK fill:#fafafa,stroke:#9e9e9e
-    style NC fill:#e1f5fe,stroke:#0277bd
-    style SC fill:#fce4ec,stroke:#c62828
-    style NK fill:#e8f5e9,stroke:#2e7d32
-    style SA fill:#fff3e0,stroke:#ef6c00
-    style APP fill:#f3e5f5,stroke:#7b1fa2
-```
-
-### Distribución de Source Sets KMP
-
-```mermaid
-graph TD
-    subgraph commonMain["commonMain (95%+ of code)"]
-        direction LR
-        A[Interfaces & Contracts]
-        B[Sealed Classes & Data Models]
-        C[Default Implementations]
-        D[Execution Pipeline]
-        E[Error Taxonomy]
-    end
-
-    subgraph platformSets["Platform Source Sets"]
-        direction LR
-        subgraph androidMain["androidMain"]
-            F[AndroidSecretStore]
-            G[AndroidStoreConfig]
-            H[PlatformHttpClient.android]
-        end
-
-        subgraph iosMain["iosMain"]
-            I[IosSecretStore]
-            J[KeychainConfig]
-            K[PlatformHttpClient.ios]
-        end
-    end
-
-    commonMain --> platformSets
-
-    style commonMain fill:#e3f2fd,stroke:#1565c0
-    style platformSets fill:#fafafa,stroke:#9e9e9e
-    style androidMain fill:#e8f5e9,stroke:#2e7d32
-    style iosMain fill:#fff3e0,stroke:#ef6c00
-```
-
-### Integración Network ↔ Security
-
-```mermaid
-graph TD
-    subgraph security-core["security-core"]
-        direction LR
-        CP[CredentialProvider]
-        CHM[CredentialHeaderMapper]
-        CR[Credential]
-        CP -->|"current()"| CR
-        CHM -->|"toHeaders()"| CR
-    end
-
-    subgraph consumer["Domain Module (e.g. sample-api)"]
-        AI[Auth Interceptor]
-    end
-
-    subgraph network-core["network-core"]
-        direction LR
-        RI[RequestInterceptor]
-        HR[HttpRequest]
-        RI -->|"modifies"| HR
-    end
-
-    AI -->|"1. calls current()"| CP
-    AI -->|"2. calls toHeaders()"| CHM
-    CHM -.->|"Map&lt;String,String&gt;"| AI
-    AI -->|"3. implements"| RI
-
-    style security-core fill:#fce4ec,stroke:#c62828
-    style network-core fill:#e1f5fe,stroke:#0277bd
-    style consumer fill:#fff3e0,stroke:#ef6c00
-```
-
----
-
-## Ejemplo de Integración
-
-Un ejemplo completo y mínimo que muestra cómo una app consumidora cablea y usa el SDK:
-
-```kotlin
-// -- Paso 1: Configuración --
-val config = NetworkConfig(
-    baseUrl = "https://jsonplaceholder.typicode.com",
-    defaultHeaders = mapOf("Accept" to "application/json"),
-    connectTimeout = 15.seconds,
-    readTimeout = 30.seconds,
-    retryPolicy = RetryPolicy.ExponentialBackoff(maxRetries = 2)
-)
-
-// -- Paso 2: Transporte --
-val engine = KtorHttpEngine.create(config)
-
-// -- Paso 3: Interceptor de auth (usando security-core) --
-val authInterceptor = RequestInterceptor { request, _ ->
-    val credential = myCredentialProvider.current()
-        ?: return@RequestInterceptor request
-    val headers = CredentialHeaderMapper.toHeaders(credential)
-    request.copy(headers = request.headers + headers)
-}
-
-// -- Paso 4: Executor --
-val executor = DefaultSafeRequestExecutor(
-    engine = engine,
-    config = config,
-    classifier = KtorErrorClassifier(),
-    interceptors = listOf(authInterceptor)
-)
-
-// -- Paso 5: Data source + Repository --
-val dataSource = UserRemoteDataSource(executor)
-val repository = UserRepository(dataSource)
-
-// -- Paso 6: Consumir --
-val result: NetworkResult<List<User>> = repository.getUsers()
-
-result.fold(
-    onSuccess = { users ->
-        // Modelos de dominio limpios. Sin Ktor, sin DTOs, sin RawResponse.
-        users.forEach { println("${it.displayName} (@${it.handle})") }
-    },
-    onFailure = { error ->
-        // Error semántico con mensaje seguro para usuario.
-        println("Error: ${error.message}")
-        // Diagnostic interno para logging.
-        error.diagnostic?.let { d -> logger.error(d.description, d.cause) }
-    }
-)
-```
+Para diagramas de arquitectura, consulta el [índice de diagramas](docs/diagrams/README.md).
 
 ---
 
@@ -1043,7 +294,7 @@ result.fold(
 
 | Tarea | Módulo | Estado |
 |---|---|---|
-| Implementar `AndroidSecretStore` con EncryptedSharedPreferences | `security-core` | ✅ Completado |
+| Implementar `AndroidSecretStore` con DataStore + Cipher + KeyStore | `security-core` | ✅ Completado |
 | Implementar `IosSecretStore` con Keychain Services | `security-core` | ✅ Completado |
 | Implementar `DefaultSessionController` con StateFlow + almacenamiento de tokens | `security-core` | ✅ Completado |
 | Implementar `DefaultCredentialProvider` respaldado por SessionController | `security-core` | ✅ Completado |
@@ -1077,7 +328,7 @@ result.fold(
 | `HttpEngine.healthCheck()` — liveness probing (default true, implementado en KtorHttpEngine) | `network-core` / `network-ktor` | ✅ Completado |
 | `SecretStore.keys()` + `putStringIfAbsent()` — migración/diagnóstico y escritura atómica | `security-core` | ✅ Completado |
 | Cleanup de TODOs redundantes — reclasificación de logging/caching/circuit-breaker | Todos | ✅ Completado |
-| Publicación en Maven Central | Todos | ✅ Completado (v0.1.0) |
+| Publicación en Maven Central | Todos | ✅ Completado (v0.2.0) |
 | Política de reintento circuit breaker | `network-core` | 🔴 No iniciado |
 | Primer módulo de dominio en producción | Nuevo módulo | 🔴 No iniciado |
 
@@ -1092,7 +343,7 @@ Consulta [`docs/security-checklist.md`](docs/security-checklist.md) para el chec
 |---|---|---|
 | **NETWORK-1** — Solo HTTPS | `NetworkConfig` rechaza `http://` por defecto | `network-core` |
 | **NETWORK-2** — Certificate Pinning | `TrustPolicy` → OkHttp / Darwin TLS | `network-ktor` |
-| **STORAGE-1** — Almacenamiento seguro | `SecretStore` → EncryptedSharedPrefs / Keychain | `security-core` |
+| **STORAGE-1** — Almacenamiento seguro | `SecretStore` → DataStore + Cipher + Keystore / Keychain | `security-core` |
 | **STORAGE-2** — No secretos en logs | `toString()` redactado en `Credential`, `HttpRequest`, `RawResponse`, `SessionCredentials` | `security-core`, `network-core` |
 | **PRIVACY-1** — Header sanitization | `LoggingObserver` redacta ALL headers por defecto | `network-core` |
 | **PRIVACY-2** — Query params en observabilidad | `MetricsObserver` / `TracingObserver` strip query params | `network-core` |

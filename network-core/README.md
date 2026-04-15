@@ -448,7 +448,7 @@ class MetricsObserver(private val client: MetricsClient) : NetworkEventObserver 
 ### Maven Central
 
 ```kotlin
-implementation("io.github.dancrrdz93:network-core:0.1.0")
+implementation("io.github.dancrrdz93:network-core:0.2.0")
 ```
 
 ### Dependencia transitiva

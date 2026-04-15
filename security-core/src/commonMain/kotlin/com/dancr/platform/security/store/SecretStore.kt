@@ -1,7 +1,7 @@
 package com.dancr.platform.security.store
 
 // Platform-secure storage abstraction.
-// Implementations: AndroidSecretStore (EncryptedSharedPreferences + Keystore),
+// Implementations: AndroidSecretStore (DataStore + Cipher + Keystore),
 //                  IosSecretStore (Keychain Services).
 //
 // Design note: A typed overload (suspend fun <T> put(key, value, serializer)) was considered

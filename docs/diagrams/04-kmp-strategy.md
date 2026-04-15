@@ -49,7 +49,7 @@ graph TB
     subgraph platformMain["Platform Source Sets"]
         direction LR
         subgraph androidMain["androidMain — 3 archivos"]
-            AND1["AndroidSecretStore<br/><i>EncryptedSharedPreferences<br/>+ Android Keystore</i>"]
+            AND1["AndroidSecretStore<br/><i>DataStore + Cipher<br/>+ Android Keystore</i>"]
             AND2["AndroidStoreConfig"]
             AND3["PlatformHttpClient.android<br/><i>OkHttp + CertificatePinner</i>"]
         end

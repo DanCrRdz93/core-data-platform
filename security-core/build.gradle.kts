@@ -23,7 +23,7 @@ kotlin {
             implementation(kotlin("test"))
         }
         androidMain.dependencies {
-            implementation(libs.androidx.security.crypto)
+            implementation(libs.androidx.datastore.preferences)
         }
     }
 }

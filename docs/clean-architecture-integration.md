@@ -8,8 +8,7 @@
 
 ```
 app/
-├── presentation/     ← ViewModels, UI, Compose
-├── domain/           ← Entidades, UseCases, interfaces de Repository
+├── domain/           ← Entidades, interfaces de Repository
 └── data/             ← Implementaciones de Repository, DataSources, DTOs
     ├── repository/
     ├── datasource/
@@ -17,7 +16,7 @@ app/
     └── mapper/
 ```
 
-El SDK encaja **exactamente en `data/`**. No toca `domain/` ni `presentation/`.
+El SDK encaja **exactamente en `data/`**. No toca `domain/`.
 
 ---
 
@@ -28,8 +27,7 @@ El SDK encaja **exactamente en `data/`**. No toca `domain/` ni `presentation/`.
 │  domain/                                                    │
 │                                                             │
 │  ├── model/User.kt              ← TU entidad de dominio     │
-│  ├── repository/UserRepository   ← TU interfaz              │
-│  └── usecase/GetUsersUseCase     ← TU use case              │
+│  └── repository/UserRepository   ← TU interfaz              │
 │                                                             │
 │  ⚠️ AQUÍ NO IMPORTAS NADA DEL SDK                            │
 │  ⚠️ domain/ no sabe que el SDK existe                        │
@@ -179,6 +177,11 @@ class UserRemoteDataSource(
 - `execute()` manda la request, maneja retry, clasifica errores, y te devuelve `NetworkResult<T>`
 - Tú solo defines la ruta, el método HTTP, y cómo deserializar
 
+> **Convención de naming: `fetch` vs `get`**
+> Los métodos del DataSource usan el prefijo **`fetch`** (ej. `fetchUsers()`) porque acceden a la red y retornan **DTOs crudos** (`NetworkResult<UserDto>`). Los métodos del Repository usan el prefijo **`get`** (ej. `getUsers()`) porque retornan **modelos de dominio** ya mapeados (`Result<User>`). Esta distinción es intencional en todo el SDK.
+
+> **Más escenarios del DataSource:** El ejemplo anterior solo muestra GET. El SDK soporta todos los métodos HTTP (POST, PUT, PATCH, DELETE), query params vía `HttpRequest.queryParams`, body JSON, manejo de 204 No Content, headers custom por request, y `RequestContext` para trazabilidad y control de retry por request. Ver `docs/integration-guide.md` sección **Crear un Módulo de Dominio → Paso 4** para ejemplos completos de cada escenario.
+
 ### 6. Implementa tu Repository en `data/` — **la capa puente**
 
 Aquí es donde conviertes `NetworkResult<T>` del SDK a `Result<T>` de tu `domain/`:
@@ -225,6 +228,8 @@ private fun NetworkError.toException(): Exception = when (this) {
 
 **¿Por qué este paso?** Porque tu `domain/` no debe saber que existe `NetworkResult`. El Repository es el **adaptador** entre el mundo del SDK y tu dominio.
 
+> **Nota:** Observa que el Repository expone `getUsers()` (no `fetchUsers()`). Internamente llama a `remoteDataSource.fetchUsers()` (DTOs) y lo transforma a `Result<User>` (dominio). El cambio de prefijo comunica que cruzaste la frontera de capa.
+
 ### 7. Configura el DI (Hilt)
 
 ```kotlin
@@ -264,11 +269,18 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideExecutor(config: NetworkConfig): SafeRequestExecutor {
+        // Para agregar certificate pinning, pasa un TrustPolicy:
+        // val engine = KtorHttpEngine.create(config, trustPolicy)
         val engine = KtorHttpEngine.create(config)
+
         return DefaultSafeRequestExecutor(
             engine = engine,
             config = config,
             classifier = KtorErrorClassifier()
+            // Opciones adicionales (ver docs/integration-guide.md):
+            // interceptors = listOf(authInterceptor, tracingInterceptor)
+            // responseInterceptors = listOf(rateLimitInterceptor)
+            // observers = listOf(loggingObserver, metricsObserver)
         )
     }
 
@@ -286,72 +298,44 @@ object NetworkModule {
 }
 ```
 
-### 8. Usa en tu UseCase (sin saber nada del SDK)
+### 8. Consume el repository
+
+Desde cualquier componente de tu app, consume la interfaz inyectada:
 
 ```kotlin
-// domain/usecase/GetUsersUseCase.kt
-package com.tuapp.domain.usecase
-
-import com.tuapp.domain.model.User
-import com.tuapp.domain.repository.UserRepository
-
-class GetUsersUseCase(
-    private val repository: UserRepository
-) {
-    suspend operator fun invoke(): Result<List<User>> =
-        repository.getUsers()
-}
+repository.getUsers()
+    .onSuccess { users -> /* modelos de dominio limpios */ }
+    .onFailure { error -> /* error.message es seguro para el usuario */ }
 ```
 
-### 9. Usa en tu ViewModel (sin saber nada del SDK)
-
-```kotlin
-// presentation/UserViewModel.kt
-class UserViewModel @Inject constructor(
-    private val getUsers: GetUsersUseCase
-) : ViewModel() {
-
-    private val _uiState = MutableStateFlow<UserUiState>(UserUiState.Loading)
-    val uiState: StateFlow<UserUiState> = _uiState.asStateFlow()
-
-    fun loadUsers() {
-        viewModelScope.launch {
-            _uiState.value = UserUiState.Loading
-            getUsers()
-                .onSuccess { _uiState.value = UserUiState.Success(it) }
-                .onFailure { _uiState.value = UserUiState.Error(it.message ?: "Error") }
-        }
-    }
-}
-```
+Lo importante es que los consumidores **nunca importen el SDK directamente** — solo la interfaz `UserRepository` definida en el paso 2.
 
 ---
 
 ## Diagrama de dependencias
 
 ```
-presentation/                  domain/                    data/
-┌──────────────┐        ┌──────────────────┐       ┌─────────────────────┐
-│ UserViewModel │───────▶│ GetUsersUseCase  │       │                     │
-└──────────────┘        │                  │       │ UserRepositoryImpl  │
-                        │ UserRepository   │◀──────│   (implementa)      │
-                        │   (interfaz)     │       │                     │
-                        │                  │       │ UserRemoteDataSource│
-                        │ User             │       │   (usa SDK)         │
-                        │   (entidad)      │       │                     │
-                        └──────────────────┘       │ UserDto + Mapper    │
-                                                   └─────────┬───────────┘
-                         NO conoce el SDK                     │
-                                                              ▼
-                                                   ┌─────────────────────┐
-                                                   │   Core Data Platform│
-                                                   │   SDK               │
-                                                   │                     │
-                                                   │ SafeRequestExecutor │
-                                                   │ RemoteDataSource    │
-                                                   │ NetworkResult       │
-                                                   │ NetworkError        │
-                                                   └─────────────────────┘
+domain/                    data/
+┌──────────────────┐       ┌─────────────────────┐
+│                  │       │ UserRepositoryImpl  │
+│ UserRepository   │◀──────│   (implementa)      │
+│   (interfaz)     │       │                     │
+│                  │       │ UserRemoteDataSource│
+│ User             │       │   (usa SDK)         │
+│   (entidad)      │       │                     │
+└──────────────────┘       │ UserDto + Mapper    │
+                           └─────────┬───────────┘
+ NO conoce el SDK                     │
+                                      ▼
+                           ┌─────────────────────┐
+                           │   Core Data Platform│
+                           │   SDK               │
+                           │                     │
+                           │ SafeRequestExecutor │
+                           │ RemoteDataSource    │
+                           │ NetworkResult       │
+                           │ NetworkError        │
+                           └─────────────────────┘
 ```
 
 ---
@@ -360,7 +344,6 @@ presentation/                  domain/                    data/
 
 | Capa | ¿Sabe del SDK? | ¿Importa tipos del SDK? | ¿Qué tipos usa? |
 |---|---|---|---|
-| `presentation/` | ❌ No | Nunca | `Result<T>`, tus entidades de `domain/` |
 | `domain/` | ❌ No | Nunca | `Result<T>`, tus entidades, tus interfaces |
 | `data/` | ✅ Sí | Solo aquí | `SafeRequestExecutor`, `RemoteDataSource`, `NetworkResult`, `NetworkError`, `HttpRequest` |
 | `di/` | ✅ Sí | Solo para crear | `NetworkConfig`, `KtorHttpEngine`, `DefaultSafeRequestExecutor` |
@@ -391,7 +374,7 @@ class UserRepositoryImpl(
 }
 ```
 
-Esto elimina la conversión `NetworkResult → Result` y te da acceso directo a `.fold()`, `.map()`, `.onFailure { error -> }` con errores tipados en el ViewModel. Es más simple pero acopla tu dominio al SDK.
+Esto elimina la conversión `NetworkResult → Result` y te da acceso directo a `.fold()`, `.map()`, `.onFailure { error -> }` con errores tipados en los consumidores. Es más simple pero acopla tu dominio al SDK.
 
 **¿Cuándo vale la pena?**
 - Tu app solo habla con APIs vía este SDK (no tienes otras fuentes de datos remotas)

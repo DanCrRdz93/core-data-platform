@@ -21,13 +21,8 @@ Tú solo interactúas con **repositorios** que devuelven modelos de dominio limp
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  Presentation (SwiftUI + ViewModel)             │
-│  • Solo conoce protocolos del domain layer      │
-│  • Recibe dependencias vía init (DI)            │
-├─────────────────────────────────────────────────┤
-│  Domain (Use Cases + Protocolos)                │
+│  Domain (Protocolos)                            │
 │  • Define UserRepositoryProtocol                │
-│  • Contiene lógica de negocio si aplica         │
 │  • No importa el SDK directamente               │
 ├─────────────────────────────────────────────────┤
 │  Data (SDK + Adapters)                          │
@@ -36,13 +31,13 @@ Tú solo interactúas con **repositorios** que devuelven modelos de dominio limp
 │  • IosSecretStore para almacenamiento seguro    │
 ├─────────────────────────────────────────────────┤
 │  Core Data Platform SDK (Maven Central / KMP)   │
-│  io.github.dancrrdz93:network-core:0.1.0       │
-│  io.github.dancrrdz93:network-ktor:0.1.0       │
-│  io.github.dancrrdz93:security-core:0.1.0      │
+│  io.github.dancrrdz93:network-core:0.2.0       │
+│  io.github.dancrrdz93:network-ktor:0.2.0       │
+│  io.github.dancrrdz93:security-core:0.2.0      │
 └─────────────────────────────────────────────────┘
 ```
 
-**Principio clave:** tu ViewModel nunca sabe que el SDK existe. Solo conoce un protocolo que le provee datos.
+**Principio clave:** los consumidores del SDK nunca importan Ktor ni ven detalles de transporte. Solo interactúan con protocolos y resultados tipados.
 
 ---
 
@@ -80,9 +75,9 @@ Todas las clases Kotlin del SDK estarán disponibles como clases Objective-C com
 
 > **Nota:** Los ejemplos de esta guía usan `User` y `UserRepository` del módulo `:sample-api`, que es un **módulo piloto de referencia**. En tu proyecto real, sustituirás esto por tus propios módulos de dominio (ej. `:payments-api`, `:loyalty-api`) siguiendo el mismo patrón.
 
-### Paso 1 — Capa Domain: define el contrato
+### Paso 1 — Define el protocolo del repository
 
-Define un protocolo Swift que abstraiga el repository. Las capas superiores (ViewModel, Use Cases) solo conocerán este protocolo.
+Define un protocolo Swift que abstraiga el repository del SDK. Esto permite desacoplar tu app del SDK concreto.
 
 ```swift
 // Domain/Protocols/UserRepositoryProtocol.swift
@@ -95,11 +90,11 @@ protocol UserRepositoryProtocol {
 }
 ```
 
-> **Principio SOLID (D — Dependency Inversion):** El ViewModel depende de una abstracción (`UserRepositoryProtocol`), no del `UserRepository` concreto del SDK.
+> **Dependency Inversion:** Los consumidores dependen de esta abstracción, no del `UserRepository` concreto del SDK.
 
 ---
 
-## Paso 2 — Capa Domain: modelo de dominio Swift (opcional)
+## Paso 2 — Modelo de dominio Swift (opcional)
 
 Si prefieres modelos Swift nativos en vez de las clases KMP exportadas:
 
@@ -236,9 +231,9 @@ final class DependencyContainer {
 
 > **Principio SOLID (D — Dependency Inversion):** El container crea las implementaciones concretas, pero expone solo protocolos. Toda la app depende de abstracciones.
 
-### Paso 6 — Consumir desde la capa domain
+### Paso 6 — Consumir el protocolo
 
-Desde un Use Case, ViewModel, o cualquier componente de tu app, consume el protocolo inyectado:
+Desde cualquier componente de tu app, consume el protocolo inyectado:
 
 ```swift
 // El consumidor solo conoce el protocolo — no sabe que el SDK existe
@@ -250,7 +245,10 @@ do {
 }
 ```
 
-La capa de presentación (ViewModel, SwiftUI, etc.) queda a criterio de tu arquitectura. Lo importante es que **nunca importe `CoreDataPlatform` directamente** — solo el protocolo definido en el Paso 1.
+Lo importante es que los consumidores **nunca importen `CoreDataPlatform` directamente** — solo el protocolo definido en el Paso 1.
+
+> **Convención de naming: `fetch` vs `get`**
+> En todo el SDK y las guías, los métodos del **DataSource** (capa interna) usan el prefijo **`fetch`** (ej. `fetchUsers()`) porque acceden directamente a la red y retornan **DTOs** (`NetworkResult<UserDto>`). Los métodos del **Repository** y **protocolo** (capa pública) usan el prefijo **`get`** (ej. `getUsers()`) porque retornan **modelos de dominio** ya mapeados. Si ves `fetch`, sabes que trabajas con datos crudos del API. Si ves `get`, sabes que trabajas con datos listos para tu UI.
 
 ---
 
@@ -442,20 +440,13 @@ Con sanitización, el output redacta valores sensibles:
 
 ---
 
-## Resumen: Clean Architecture con el SDK
+## Resumen: capas y responsabilidades
 
 | Capa | Responsabilidad | Conoce al SDK? |
 |---|---|---|
-| **Domain** (Protocolos + Use Cases) | Contratos, lógica de negocio | ❌ Puro Swift |
-| **Data** (Adapter + SDK) | Conecta SDK con protocolos del domain | ✅ Importa `CoreDataPlatform` |
-| **DI** (Container) | Ensambla las capas | ✅ Crea instancias concretas |
-
-**Principios SOLID aplicados:**
-- **S** — El adapter solo traduce entre el SDK y tu protocolo. No contiene lógica de negocio.
-- **O** — El SDK es extensible (interceptors, observers) sin modificar código existente.
-- **L** — El adapter es sustituible por cualquier implementación del protocolo (ej. mock para tests).
-- **I** — Protocolos pequeños y enfocados: `UserRepositoryProtocol`, `CredentialProvider`, `SecretStore`.
-- **D** — Los consumidores dependen de la abstracción (`UserRepositoryProtocol`), no del `UserRepository` concreto.
+| **Domain** (Protocolos) | Define contratos (`UserRepositoryProtocol`) | ❌ No |
+| **Data** (Adapter + SDK) | Conecta SDK con los protocolos | ✅ Sí |
+| **DI** (Container) | Ensambla y expone abstracciones | ✅ Sí |
 
 ---
 
@@ -486,40 +477,8 @@ final class MockUserRepository: UserRepositoryProtocol {
 **¿Puedo ver los logs de las requests?**
 Sí. Crea un `LoggingObserver` con tu `NetworkLogger` y pásalo al factory. Ver la sección [Logging y observabilidad](#logging-y-observabilidad).
 
-**¿El SDK funciona con SwiftUI?**
-Sí. El SDK no tiene dependencia de ningún framework de UI. Los repositorios devuelven datos vía `async/await`, que es compatible nativamente con SwiftUI:
-```swift
-struct UsersView: View {
-    @StateObject private var viewModel = UsersViewModel()
-
-    var body: some View {
-        List(viewModel.users, id: \.id) { user in
-            Text(user.name)
-        }
-        .task { await viewModel.loadUsers() }
-    }
-}
-```
-
-**¿Puedo usar Combine con el SDK?**
-Las funciones del SDK son `async`, no publican vía Combine directamente. Sin embargo, puedes bridgear fácilmente:
-```swift
-import Combine
-
-func usersPublisher() -> AnyPublisher<[User], AppNetworkError> {
-    Future { promise in
-        Task {
-            do {
-                let users = try await repository.getUsers()
-                promise(.success(users))
-            } catch let error as AppNetworkError {
-                promise(.failure(error))
-            }
-        }
-    }
-    .eraseToAnyPublisher()
-}
-```
+**¿El SDK es compatible con SwiftUI y Combine?**
+Sí. El SDK no tiene dependencia de ningún framework de UI. Los repositorios devuelven datos vía `async/await`, que es compatible nativamente con cualquier capa de presentación que elijas.
 
 ---
 
@@ -685,18 +644,14 @@ task.cancel()  // la request se cancela, recibes un error de cancelación
 ```
 
 **¿Cómo manejo la concurrencia con el SDK?**
-Las funciones del SDK son `async` y thread-safe. Puedes llamarlas desde cualquier actor o Task. Si usas `@MainActor` en tu ViewModel, las llamadas al SDK se ejecutarán en un hilo de background automáticamente y el resultado volverá al main thread:
+Las funciones del SDK son `async` y thread-safe. Puedes llamarlas desde cualquier actor o Task. Las llamadas al SDK se ejecutan en un hilo de background automáticamente:
 ```swift
-@MainActor
-class UsersViewModel: ObservableObject {
-    @Published var users: [User] = []
-
-    func loadUsers() async {
-        do {
-            users = try await repository.getUsers()  // async en background, resultado en main
-        } catch {
-            // manejar error
-        }
+func loadUsers() async {
+    do {
+        let users = try await repository.getUsers()  // async en background
+        // usar los datos
+    } catch {
+        // manejar error
     }
 }
 ```
@@ -712,6 +667,70 @@ let order = try await orderRepository.createOrder(item: "abc", quantity: 2)
 
 // La serialización JSON ocurre internamente en el DataSource (Kotlin)
 ```
+
+**¿Cómo implemento paginación?**
+La paginación se maneja en el DataSource (Kotlin). Usa el campo `queryParams` de `HttpRequest`:
+```kotlin
+// En el DataSource (Kotlin)
+suspend fun fetchUsers(page: Int, size: Int): NetworkResult<List<UserDto>> = execute(
+    request = HttpRequest(
+        path = "/users",
+        method = HttpMethod.GET,
+        queryParams = mapOf(
+            "page" to page.toString(),
+            "size" to size.toString()
+        )
+    ),
+    deserialize = { json.decodeFromString(it.body!!.decodeToString()) }
+)
+```
+```swift
+// Desde Swift, llamas al repository (alto nivel)
+let firstPage = try await repository.getUsers(page: 1, size: 20)
+```
+
+**¿Qué pasa si el servidor retorna 204 No Content (body vacío)?**
+Protege contra bodies nulos en la lambda de deserialización del DataSource (Kotlin):
+```kotlin
+// En el DataSource (Kotlin)
+suspend fun deleteUser(id: Long): NetworkResult<Unit> = execute(
+    request = HttpRequest(path = "/users/$id", method = HttpMethod.DELETE),
+    deserialize = { /* 204 No Content — no hay body */ }
+)
+```
+
+**¿Puedo configurar retry diferente por endpoint?**
+Sí. En el DataSource (Kotlin), usa `RequestContext.retryPolicyOverride`:
+```kotlin
+// En el DataSource (Kotlin) — nunca reintentar operaciones de pago
+suspend fun createPayment(dto: CreatePaymentDto): NetworkResult<PaymentDto> = execute(
+    request = HttpRequest(
+        path = "/payments",
+        method = HttpMethod.POST,
+        headers = mapOf("Content-Type" to "application/json"),
+        body = json.encodeToString(dto).encodeToByteArray()
+    ),
+    context = RequestContext(
+        operationId = "create-payment",
+        retryPolicyOverride = RetryPolicy.None
+    ),
+    deserialize = { json.decodeFromString(it.body!!.decodeToString()) }
+)
+```
+
+**¿Qué errores se reintentan automáticamente?**
+Solo los que tienen `isRetryable = true`:
+
+| Error | ¿Reintentable? | Razón |
+|---|---|---|
+| `Connectivity` | ✅ Sí | Puede ser transitorio (red intermitente) |
+| `Timeout` | ✅ Sí | El servidor pudo estar ocupado temporalmente |
+| `ServerError` (5xx) | ✅ Sí | El servidor puede recuperarse |
+| `Authentication` (401) | ❌ No | Requiere intervención del usuario o refresh |
+| `Authorization` (403) | ❌ No | El usuario no tiene permisos |
+| `ClientError` (4xx) | ❌ No | La request es inválida |
+| `Serialization` | ❌ No | Desajuste de contrato (no transitorio) |
+| `Cancelled` | ❌ No | Acción intencional del usuario |
 
 ---
 

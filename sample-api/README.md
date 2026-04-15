@@ -89,11 +89,11 @@ graph TD
 ### Flujo de datos
 
 ```
-El consumidor llama repository.getUsers()
+El consumidor llama repository.getUsers()       ← prefijo "get" = retorna modelos de dominio
     │
     ▼
 UserRepository
-    │  llama dataSource.fetchUsers()
+    │  llama dataSource.fetchUsers()            ← prefijo "fetch" = accede a la red, retorna DTOs
     │  mapea resultado: .map(UserMapper::toDomain)
     ▼
 UserRemoteDataSource : RemoteDataSource
@@ -112,6 +112,8 @@ NetworkResult<List<UserDto>>
     ▼
 NetworkResult<List<User>>  ← el consumidor recibe modelos de dominio limpios
 ```
+
+> **Convención de naming:** Los métodos del **DataSource** usan `fetch` (acceden a la red, retornan DTOs). Los métodos del **Repository** usan `get` (retornan modelos de dominio mapeados). Esta distinción es intencional en todo el SDK.
 
 ---
 
@@ -349,9 +351,9 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // SDK desde Maven Central
-            implementation("io.github.dancrrdz93:network-core:0.1.0")
-            implementation("io.github.dancrrdz93:network-ktor:0.1.0")
-            implementation("io.github.dancrrdz93:security-core:0.1.0")
+            implementation("io.github.dancrrdz93:network-core:0.2.0")
+            implementation("io.github.dancrrdz93:network-ktor:0.2.0")
+            implementation("io.github.dancrrdz93:security-core:0.2.0")
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
         }
@@ -401,16 +403,16 @@ kotlin {
 ### Maven Central
 
 ```kotlin
-implementation("io.github.dancrrdz93:sample-api:0.1.0")
+implementation("io.github.dancrrdz93:sample-api:0.2.0")
 ```
 
 ### Dependencias transitivas
 
 ```kotlin
 // commonMain
-implementation("io.github.dancrrdz93:network-core:0.1.0")
-implementation("io.github.dancrrdz93:network-ktor:0.1.0")
-implementation("io.github.dancrrdz93:security-core:0.1.0")
+implementation("io.github.dancrrdz93:network-core:0.2.0")
+implementation("io.github.dancrrdz93:network-ktor:0.2.0")
+implementation("io.github.dancrrdz93:security-core:0.2.0")
 implementation(libs.kotlinx.coroutines.core)        // 1.10.1
 implementation(libs.kotlinx.serialization.json)      // 1.7.3
 ```

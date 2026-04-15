@@ -21,13 +21,8 @@ Tú solo interactúas con **repositorios** que devuelven modelos de dominio limp
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  Presentation (Compose + ViewModel)             │
-│  • Solo conoce interfaces del domain layer      │
-│  • Recibe dependencias vía constructor (DI)     │
-├─────────────────────────────────────────────────┤
-│  Domain (Use Cases + Interfaces)                │
+│  Domain (Interfaces)                            │
 │  • Define UserRepositoryContract                │
-│  • Contiene lógica de negocio si aplica         │
 │  • No importa el SDK directamente               │
 ├─────────────────────────────────────────────────┤
 │  Data (SDK + Adapters)                          │
@@ -36,13 +31,13 @@ Tú solo interactúas con **repositorios** que devuelven modelos de dominio limp
 │  • AndroidSecretStore para almacenamiento seguro│
 ├─────────────────────────────────────────────────┤
 │  Core Data Platform SDK (Maven Central)         │
-│  io.github.dancrrdz93:network-core:0.1.0       │
-│  io.github.dancrrdz93:network-ktor:0.1.0       │
-│  io.github.dancrrdz93:security-core:0.1.0      │
+│  io.github.dancrrdz93:network-core:0.2.0       │
+│  io.github.dancrrdz93:network-ktor:0.2.0       │
+│  io.github.dancrrdz93:security-core:0.2.0      │
 └─────────────────────────────────────────────────┘
 ```
 
-**Principio clave:** tu ViewModel nunca sabe que el SDK existe. Solo conoce una interfaz que le provee datos.
+**Principio clave:** los consumidores del SDK nunca importan Ktor ni ven detalles de transporte. Solo interactúan con interfaces y `NetworkResult<T>`.
 
 ---
 
@@ -50,9 +45,9 @@ Tú solo interactúas con **repositorios** que devuelven modelos de dominio limp
 
 > **Nota:** Los ejemplos de esta guía usan `User` y `UserRepository` del módulo `:sample-api`, que es un **módulo piloto de referencia**. En tu proyecto real, sustituirás esto por tus propios módulos de dominio (ej. `:payments-api`, `:loyalty-api`) siguiendo el mismo patrón.
 
-### Paso 1 — Capa Domain: define el contrato
+### Paso 1 — Define el contrato del repository
 
-Define una interfaz que abstraiga el repository. Las capas superiores (ViewModel, Use Cases) solo conocerán esta interfaz.
+Define una interfaz que abstraiga el repository del SDK. Esto permite desacoplar tu app del SDK concreto.
 
 ```kotlin
 // domain/repository/UserRepositoryContract.kt
@@ -66,7 +61,7 @@ interface UserRepositoryContract {
 }
 ```
 
-> **Principio SOLID (D — Dependency Inversion):** El ViewModel depende de una abstracción (`UserRepositoryContract`), no del `UserRepository` concreto del SDK.
+> **Dependency Inversion:** Los consumidores dependen de esta abstracción, no del `UserRepository` concreto del SDK.
 
 ### Paso 2 — Capa Data: adapter que conecta el SDK con tu contrato
 
@@ -131,9 +126,9 @@ val dataModule = module {
 
 > **Principio SOLID (D — Dependency Inversion):** El módulo DI crea las implementaciones concretas, pero expone solo la interfaz. Toda la app depende de abstracciones.
 
-### Paso 4 — Consumir desde la capa domain
+### Paso 4 — Consumir el contrato
 
-Desde un Use Case, ViewModel, o cualquier componente de tu app, consume el contrato inyectado:
+Desde cualquier componente de tu app, consume el contrato inyectado:
 
 ```kotlin
 // El consumidor solo conoce la interfaz — no sabe que el SDK existe
@@ -143,7 +138,7 @@ repository.getUsers().fold(
 )
 ```
 
-La capa de presentación (ViewModel, Compose, etc.) queda a criterio de tu arquitectura. Lo importante es que **nunca importe el SDK directamente** — solo el contrato definido en el Paso 1.
+Lo importante es que los consumidores **nunca importen el SDK directamente** — solo el contrato definido en el Paso 1.
 
 ---
 
@@ -234,7 +229,7 @@ import com.dancr.platform.security.credential.DefaultCredentialProvider
 import com.dancr.platform.security.session.DefaultSessionController
 import com.dancr.platform.security.store.AndroidSecretStore
 
-// 1. Configura el almacenamiento seguro (EncryptedSharedPreferences + Android Keystore)
+// 1. Configura el almacenamiento seguro (DataStore + Cipher + Android Keystore)
 val secretStore = AndroidSecretStore(context)
 
 // 2. Crea el session controller con tu lógica de refresh
@@ -447,13 +442,13 @@ D/CoreDataPlatform: --> GET /users [Accept: application/json, Authorization: █
 ```
 Tu código (solo conoce UserRepositoryContract)
     │
-    │  repository.getUsers()
+    │  repository.getUsers()           ← prefijo "get" = retorna modelos de dominio
     ▼
 UserRepositoryAdapter (capa data — implementa el contrato)
     │
     ▼
 UserRepository (del SDK)
-    │  llama dataSource.fetchUsers()
+    │  llama dataSource.fetchUsers()   ← prefijo "fetch" = accede a la red, retorna DTOs
     │  mapea el resultado: .map(UserMapper::toDomain)
     ▼
 UserRemoteDataSource
@@ -472,30 +467,26 @@ DefaultSafeRequestExecutor  ← (aquí pasa todo lo importante)
 NetworkResult<List<User>>  ← esto es lo que recibe tu código
 ```
 
+> **Convención de naming: `fetch` vs `get`**
+> En todo el SDK y las guías, los métodos del **DataSource** usan el prefijo **`fetch`** (ej. `fetchUsers()`) porque acceden directamente a la red y retornan **DTOs** (`NetworkResult<UserDto>`). Los métodos del **Repository** usan el prefijo **`get`** (ej. `getUsers()`) porque retornan **modelos de dominio** ya mapeados (`NetworkResult<User>`). Si ves `fetch`, sabes que trabajas con datos crudos del API. Si ves `get`, sabes que trabajas con datos listos para tu UI.
+
 **Lo importante:** tu código solo ve la interfaz `UserRepositoryContract` y el resultado `NetworkResult<User>`. Todo lo del medio es transparente.
 
 ---
 
-## Resumen: Clean Architecture con el SDK
+## Resumen: capas y responsabilidades
 
 | Capa | Responsabilidad | Conoce al SDK? |
 |---|---|---|
-| **Domain** (Interfaces + Use Cases) | Contratos, lógica de negocio | ❌ Puro Kotlin |
-| **Data** (Adapter + SDK) | Conecta SDK con interfaces del domain | ✅ Importa SDK |
-| **DI** (Hilt / Koin module) | Ensambla las capas | ✅ Crea instancias concretas |
-
-**Principios SOLID aplicados:**
-- **S** — El adapter solo traduce entre el SDK y tu contrato. No contiene lógica de negocio.
-- **O** — El SDK es extensible (interceptors, observers) sin modificar código existente.
-- **L** — El adapter es sustituible por cualquier implementación del contrato (ej. mock para tests).
-- **I** — Interfaces pequeñas y enfocadas: `UserRepositoryContract`, `CredentialProvider`, `SecretStore`.
-- **D** — Los consumidores dependen de la abstracción (`UserRepositoryContract`), no del `UserRepository` concreto.
+| **Domain** (Interfaces) | Define contratos (`UserRepositoryContract`) | ❌ No |
+| **Data** (Adapter + SDK) | Conecta SDK con los contratos | ✅ Sí |
+| **DI** (Hilt / Koin) | Ensambla y expone abstracciones | ✅ Sí |
 
 ### Referencia rápida
 
 | Quiero... | Hago... |
 |---|---|
-| Obtener datos | `repository.getUsers()` → devuelve `NetworkResult<List<User>>` |
+| Obtener datos de dominio | `repository.getUsers()` → devuelve `NetworkResult<List<User>>` (modelos mapeados) |
 | Manejar éxito/error | `.fold(onSuccess = { }, onFailure = { })` |
 | Mostrar error al usuario | `error.message` (siempre seguro) |
 | Agregar autenticación | Configurar `AndroidSecretStore` + `DefaultSessionController` + `DefaultCredentialProvider` |
@@ -551,7 +542,7 @@ Sí. Crea un `LoggingObserver` con tu `NetworkLogger` y pásalo al factory. Ver 
 ### Seguridad
 
 **¿Cómo se almacenan las credenciales de forma segura en Android?**
-`AndroidSecretStore` usa `EncryptedSharedPreferences` respaldado por **Android Keystore**. Esto significa que los datos se cifran con AES-256-GCM y las claves criptográficas están protegidas por hardware (TEE/StrongBox cuando está disponible). Nunca se almacena nada en texto plano.
+`AndroidSecretStore` usa `DataStore Preferences` para almacenamiento y `Cipher`(AES/GCM/NoPadding) con claves generadas y almacenadas en **Android Keystore**. Los datos se cifran con AES-256-GCM y las claves criptográficas están protegidas por hardware (TEE/StrongBox cuando está disponible). Nunca se almacena nada en texto plano.
 
 **¿El SDK protege contra ataques Man-in-the-Middle (MITM)?**
 Sí, en dos niveles:
@@ -570,7 +561,7 @@ No. El SDK implementa múltiples capas de protección alineadas a OWASP MASVS:
 El SDK no detecta root. Sin embargo, las credenciales almacenadas en Android Keystore están protegidas por hardware incluso en dispositivos rooteados. Las claves son **non-exportable** — el sistema las usa internamente pero nunca las expone. Si necesitas detección de root, agrégala en tu capa de app (ej. SafetyNet/Play Integrity) y usa `sessionController.invalidate()` si detectas compromiso.
 
 **¿Los datos del SDK se incluyen en backups de Android?**
-`EncryptedSharedPreferences` cifra todo su contenido, por lo que un backup contendría datos cifrados ilegibles sin acceso al Keystore del dispositivo original. Para máxima seguridad, puedes excluir el archivo de backups en tu `AndroidManifest.xml` con `android:fullBackupContent`.
+DataStore cifra todo su contenido vía `CryptoManager`, por lo que un backup contendría datos cifrados ilegibles sin acceso al Keystore del dispositivo original. Para máxima seguridad, puedes excluir el archivo de backups en tu `AndroidManifest.xml` con `android:fullBackupContent`.
 
 **¿Qué pasa si un certificado del servidor rota y tengo pinning activo?**
 La app no podrá conectarse hasta que actualices los pins. Por eso es **obligatorio** incluir al menos un pin de respaldo (backup pin) en tu `DefaultTrustPolicy`. Cuando rotas un certificado, primero despliega una versión de la app con el nuevo pin como backup, luego rota el certificado en el servidor.
@@ -637,12 +628,16 @@ val request = HttpRequest(
 ```
 
 **¿Cómo implemento paginación?**
-Construye la request con query parameters para la página:
+Usa el campo `queryParams` de `HttpRequest` (no concatenes parámetros manualmente en el path):
 ```kotlin
 suspend fun fetchUsers(page: Int, size: Int): NetworkResult<List<UserDto>> = execute(
     request = HttpRequest(
-        path = "/users?page=$page&size=$size",
-        method = HttpMethod.GET
+        path = "/users",
+        method = HttpMethod.GET,
+        queryParams = mapOf(
+            "page" to page.toString(),
+            "size" to size.toString()
+        )
     ),
     deserialize = { json.decodeFromString(it.body!!.decodeToString()) }
 )
@@ -662,7 +657,7 @@ deserialize = { response ->
 **¿Puedo cancelar una request en curso?**
 Sí. Cancela la coroutine o el `Job` que la lanzó. Ktor propaga la cancelación correctamente y recibirás `NetworkError.Cancelled`:
 ```kotlin
-val job = viewModelScope.launch {
+val job = scope.launch {
     repository.getUsers().fold(
         onSuccess = { /* ... */ },
         onFailure = { /* ... */ }
@@ -769,7 +764,23 @@ Solo los que tienen `isRetryable = true`:
 | `Cancelled` | ❌ No | Acción intencional del usuario |
 
 **¿Puedo configurar retry solo para ciertos endpoints?**
-No directamente — `RetryPolicy` se aplica a nivel de `NetworkConfig` (todas las requests del executor). Si necesitas comportamiento diferente, crea dos executors: uno con retry para operaciones idempotentes (GET) y otro sin retry para operaciones que mutan estado (POST).
+Sí. Usa `RequestContext.retryPolicyOverride` para sobreescribir la política de retry por request:
+```kotlin
+suspend fun createPayment(dto: CreatePaymentDto): NetworkResult<PaymentDto> = execute(
+    request = HttpRequest(
+        path = "/payments",
+        method = HttpMethod.POST,
+        headers = mapOf("Content-Type" to "application/json"),
+        body = json.encodeToString(dto).encodeToByteArray()
+    ),
+    context = RequestContext(
+        operationId = "create-payment",
+        retryPolicyOverride = RetryPolicy.None  // nunca reintentar pagos
+    ),
+    deserialize = { json.decodeFromString(it.body!!.decodeToString()) }
+)
+```
+Si `retryPolicyOverride` es `null` (default), se usa la política de `NetworkConfig`. Ver `docs/integration-guide.md` sección [RequestContext](#) para más detalles.
 
 ---
 

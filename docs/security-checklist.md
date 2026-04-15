@@ -26,10 +26,10 @@ Este checklist documenta cómo el SDK `core-data-platform` cumple con las catego
 
 | Control | Estado | Implementación |
 |---|---|---|
-| **S-1**: Credenciales en almacenamiento seguro | ✅ Enforced | `SecretStore` es la única vía de persistencia. Android: `EncryptedSharedPreferences` + Keystore. iOS: Keychain Services con `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. |
+| **S-1**: Credenciales en almacenamiento seguro | ✅ Enforced | `SecretStore` es la única vía de persistencia. Android: DataStore + `Cipher`(AES/GCM/NoPadding) + Keystore. iOS: Keychain Services con `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. |
 | **S-2**: No secretos en logs | ✅ Enforced | `Credential.toString()`, `SessionCredentials.toString()`, `HttpRequest.toString()`, `RawResponse.toString()` — todos redactan valores sensibles con `██`. |
 | **S-3**: No secretos en crash reports | ✅ By design | Los `toString()` redactados aseguran que las excepciones y stack traces no contengan tokens. |
-| **S-4**: No secretos en backups | ✅ Platform | Android: `EncryptedSharedPreferences` cifra el contenido. iOS: Keychain items con `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` no se incluyen en backups no cifrados. |
+| **S-4**: No secretos en backups | ✅ Platform | Android: DataStore cifra el contenido vía `CryptoManager`. iOS: Keychain items con `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` no se incluyen en backups no cifrados. |
 
 ### Tipos con `toString()` redactado
 | Clase | Output |
@@ -87,7 +87,7 @@ val unsafeObserver = LoggingObserver(
 
 | Control | Estado | Implementación |
 |---|---|---|
-| **C-1**: Algoritmos estándar | ✅ Platform | Android: AES-256-GCM vía `EncryptedSharedPreferences`. iOS: protección de hardware vía Secure Enclave. |
+| **C-1**: Algoritmos estándar | ✅ Platform | Android: AES-256-GCM vía `Cipher` + Android Keystore. iOS: protección de hardware vía Secure Enclave. |
 | **C-2**: SHA-256 para cert pinning | ✅ Implementado | Hash de certificados DER con SHA-256 (puro Kotlin en iOS, OkHttp en Android). |
 | **C-3**: No crypto custom | ✅ By design | El SDK delega toda la criptografía a las APIs de plataforma (Keystore, Keychain). |
 

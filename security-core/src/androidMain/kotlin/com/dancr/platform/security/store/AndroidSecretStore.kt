@@ -1,114 +1,133 @@
 package com.dancr.platform.security.store
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.byteArrayPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.preferencesDataStore
 import com.dancr.platform.security.error.Diagnostic
 import com.dancr.platform.security.error.SecureStorageException
 import com.dancr.platform.security.error.SecurityError
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import android.util.Base64 as AndroidBase64
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 
 class AndroidSecretStore(
     private val context: Context,
     private val config: AndroidStoreConfig = AndroidStoreConfig()
 ) : SecretStore {
 
-    private val prefs: SharedPreferences by lazy {
-        val masterKey = MasterKey.Builder(context, config.masterKeyAlias)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .setRequestStrongBoxBacked(config.useStrongBox)
-            .build()
-        EncryptedSharedPreferences.create(
-            context,
-            config.preferencesName,
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
+    private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
+        name = config.dataStoreName
+    )
+
+    private val crypto: CryptoManager by lazy {
+        CryptoManager(keyAlias = config.keyAlias)
     }
 
-    override suspend fun putString(key: String, value: String): Unit = runOnDisk {
+    override suspend fun putString(key: String, value: String) {
         try {
-            prefs.edit().putString(prefixedKey(key), value).apply()
+            val encrypted = crypto.encryptString(value)
+            context.dataStore.edit { prefs ->
+                prefs[byteKey(key)] = encrypted
+            }
         } catch (e: Exception) {
             throw mapException(e)
         }
     }
 
-    override suspend fun getString(key: String): String? = runOnDisk {
+    override suspend fun getString(key: String): String? {
         try {
-            prefs.getString(prefixedKey(key), null)
+            val encrypted = context.dataStore.data
+                .map { prefs -> prefs[byteKey(key)] }
+                .first()
+                ?: return null
+            return crypto.decryptString(encrypted)
         } catch (e: Exception) {
             throw mapException(e)
         }
     }
 
-    override suspend fun putBytes(key: String, value: ByteArray): Unit = runOnDisk {
+    override suspend fun putBytes(key: String, value: ByteArray) {
         try {
-            val encoded = AndroidBase64.encodeToString(value, AndroidBase64.NO_WRAP)
-            prefs.edit().putString(prefixedKey(key), encoded).apply()
+            val encrypted = crypto.encrypt(value)
+            context.dataStore.edit { prefs ->
+                prefs[byteKey(key)] = encrypted
+            }
         } catch (e: Exception) {
             throw mapException(e)
         }
     }
 
-    override suspend fun getBytes(key: String): ByteArray? = runOnDisk {
+    override suspend fun getBytes(key: String): ByteArray? {
         try {
-            prefs.getString(prefixedKey(key), null)
-                ?.let { AndroidBase64.decode(it, AndroidBase64.NO_WRAP) }
+            val encrypted = context.dataStore.data
+                .map { prefs -> prefs[byteKey(key)] }
+                .first()
+                ?: return null
+            return crypto.decrypt(encrypted)
         } catch (e: Exception) {
             throw mapException(e)
         }
     }
 
-    override suspend fun remove(key: String): Unit = runOnDisk {
+    override suspend fun remove(key: String) {
         try {
-            prefs.edit().remove(prefixedKey(key)).apply()
+            context.dataStore.edit { prefs ->
+                prefs.remove(byteKey(key))
+            }
         } catch (e: Exception) {
             throw mapException(e)
         }
     }
 
-    override suspend fun clear(): Unit = runOnDisk {
+    override suspend fun clear() {
         try {
-            prefs.edit().clear().apply()
+            context.dataStore.edit { prefs ->
+                prefs.clear()
+            }
         } catch (e: Exception) {
             throw mapException(e)
         }
     }
 
-    override suspend fun contains(key: String): Boolean = runOnDisk {
+    override suspend fun contains(key: String): Boolean {
         try {
-            prefs.contains(prefixedKey(key))
+            return context.dataStore.data
+                .map { prefs -> byteKey(key) in prefs }
+                .first()
         } catch (e: Exception) {
             throw mapException(e)
         }
     }
 
-    override suspend fun keys(): Set<String> = runOnDisk {
+    override suspend fun keys(): Set<String> {
         try {
             val prefix = config.keyPrefix
-            prefs.all.keys
-                .filter { it.startsWith(prefix) }
-                .map { it.removePrefix(prefix) }
-                .toSet()
+            return context.dataStore.data
+                .map { prefs ->
+                    prefs.asMap().keys
+                        .map { it.name }
+                        .filter { it.startsWith(prefix) }
+                        .map { it.removePrefix(prefix) }
+                        .toSet()
+                }
+                .first()
         } catch (e: Exception) {
             throw mapException(e)
         }
     }
 
-    override suspend fun putStringIfAbsent(key: String, value: String): Boolean = runOnDisk {
+    override suspend fun putStringIfAbsent(key: String, value: String): Boolean {
         try {
-            val prefixed = prefixedKey(key)
-            if (prefs.contains(prefixed)) {
-                false
-            } else {
-                prefs.edit().putString(prefixed, value).apply()
-                true
+            var stored = false
+            context.dataStore.edit { prefs ->
+                if (byteKey(key) !in prefs) {
+                    prefs[byteKey(key)] = crypto.encryptString(value)
+                    stored = true
+                }
             }
+            return stored
         } catch (e: Exception) {
             throw mapException(e)
         }
@@ -116,10 +135,8 @@ class AndroidSecretStore(
 
     // -- Internal helpers --
 
-    private fun prefixedKey(key: String): String = "${config.keyPrefix}$key"
-
-    private suspend fun <T> runOnDisk(block: () -> T): T =
-        withContext(Dispatchers.IO) { block() }
+    private fun byteKey(key: String): Preferences.Key<ByteArray> =
+        byteArrayPreferencesKey("${config.keyPrefix}$key")
 
     // -- Error mapping --
 
@@ -130,8 +147,8 @@ class AndroidSecretStore(
                     description = e.message ?: "Android secure storage operation failed",
                     cause = e,
                     metadata = mapOf(
-                        "store" to "android_keystore",
-                        "prefsName" to config.preferencesName
+                        "store" to "android_keystore_datastore",
+                        "dataStoreName" to config.dataStoreName
                     )
                 )
             )
