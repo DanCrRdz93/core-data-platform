@@ -100,17 +100,17 @@ internal class ManagedWebSocketConnection(
         while (scope.coroutineContext[Job]?.isActive == true && !intentionalClose) {
             try {
                 _state.value = WebSocketState.Connecting(attempt)
-                observers.forEach { it.onConnecting(request, attempt) }
+                notifyObservers { it.onConnecting(request, attempt) }
 
                 val session = engine.connect(request)
                 currentSession = session
                 attempt = 0
                 _state.value = WebSocketState.Connected
-                observers.forEach { it.onConnected(request) }
+                notifyObservers { it.onConnected(request) }
 
                 // Collect incoming frames until session ends
                 session.incoming.collect { frame ->
-                    observers.forEach { it.onFrameReceived(request, frame) }
+                    notifyObservers { it.onFrameReceived(request, frame) }
                     channel.send(frame)
                 }
 
@@ -119,7 +119,7 @@ internal class ManagedWebSocketConnection(
                 // do NOT reconnect. Only errors trigger reconnection.
                 currentSession = null
                 _state.value = WebSocketState.Disconnected()
-                observers.forEach { it.onDisconnected(request, null) }
+                notifyObservers { it.onDisconnected(request, null) }
                 break
 
             } catch (e: CancellationException) {
@@ -130,14 +130,14 @@ internal class ManagedWebSocketConnection(
                 currentSession = null
                 val error = classifier.classify(e)
                 _state.value = WebSocketState.Disconnected(error)
-                observers.forEach { it.onDisconnected(request, error) }
+                notifyObservers { it.onDisconnected(request, error) }
 
                 if (!shouldReconnect(error, attempt)) break
             }
 
             // Reconnect delay
             val delayMs = computeDelay(config.reconnectPolicy, attempt)
-            observers.forEach { it.onReconnectScheduled(request, attempt + 1, delayMs) }
+            notifyObservers { it.onReconnectScheduled(request, attempt + 1, delayMs) }
             delay(delayMs)
             attempt++
         }
@@ -151,7 +151,7 @@ internal class ManagedWebSocketConnection(
         val session = currentSession
             ?: throw IllegalStateException("Cannot send: WebSocket is not connected")
         session.send(frame)
-        observers.forEach { it.onFrameSent(request, frame) }
+        notifyObservers { it.onFrameSent(request, frame) }
     }
 
     override suspend fun sendText(text: String) = send(WebSocketFrame.Text(text))
@@ -191,6 +191,12 @@ internal class ManagedWebSocketConnection(
 
         // Only reconnect for retryable errors (or normal closures without error)
         return error == null || error.isRetryable
+    }
+
+    private inline fun notifyObservers(action: (WebSocketEventObserver) -> Unit) {
+        observers.forEach { observer ->
+            try { action(observer) } catch (_: Throwable) { /* observer must not break pipeline */ }
+        }
     }
 
     private fun computeDelay(policy: ReconnectPolicy, attempt: Int): Long = when (policy) {

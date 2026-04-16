@@ -24,6 +24,7 @@ internal class CryptoManager(
     }
 
     fun decrypt(encryptedData: ByteArray): ByteArray {
+        require(encryptedData.size > 1) { "Encrypted data too short to contain IV length prefix" }
         val ivLength = encryptedData[0].toInt()
         val iv = encryptedData.copyOfRange(1, 1 + ivLength)
         val ciphertext = encryptedData.copyOfRange(1 + ivLength, encryptedData.size)

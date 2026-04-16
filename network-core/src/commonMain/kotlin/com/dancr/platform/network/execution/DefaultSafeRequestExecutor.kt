@@ -33,7 +33,7 @@ class DefaultSafeRequestExecutor(
         return try {
             val prepared = prepareRequest(request, context)
             val policy = context?.retryPolicyOverride ?: config.retryPolicy
-            observers.forEach { it.onRequestStarted(prepared, context) }
+            notifyObservers { it.onRequestStarted(prepared, context) }
             executeWithRetry(prepared, context, policy, deserialize)
         } catch (e: CancellationException) {
             throw e
@@ -85,7 +85,7 @@ class DefaultSafeRequestExecutor(
                     val shouldRetry = attempt < maxAttempts - 1 && result.error.isRetryable
                     if (shouldRetry) {
                         val delayMs = computeDelay(policy, attempt)
-                        observers.forEach {
+                        notifyObservers {
                             it.onRetryScheduled(request, attempt + 1, maxAttempts, result.error, delayMs)
                         }
                         delay(delayMs)
@@ -134,7 +134,7 @@ class DefaultSafeRequestExecutor(
         } catch (e: Throwable) {
             val error = classifier.classify(null, e)
             val durationMs = mark.elapsedNow().inWholeMilliseconds
-            observers.forEach { it.onRequestFailed(request, error, durationMs, context) }
+            notifyObservers { it.onRequestFailed(request, error, durationMs, context) }
             return NetworkResult.Failure(error)
         }
 
@@ -145,7 +145,7 @@ class DefaultSafeRequestExecutor(
             interceptor.intercept(current, request, context)
         }
 
-        observers.forEach { it.onResponseReceived(request, response, durationMs, context) }
+        notifyObservers { it.onResponseReceived(request, response, durationMs, context) }
 
         // Step 3: Validation
         when (val outcome = validator.validate(response)) {
@@ -163,7 +163,7 @@ class DefaultSafeRequestExecutor(
                     // Non-2xx — delegate to classifier for semantic mapping
                     classifier.classify(response, null)
                 }
-                observers.forEach { it.onRequestFailed(request, error, durationMs, context) }
+                notifyObservers { it.onRequestFailed(request, error, durationMs, context) }
                 return NetworkResult.Failure(error)
             }
         }
@@ -187,8 +187,14 @@ class DefaultSafeRequestExecutor(
                     cause = e
                 )
             )
-            observers.forEach { it.onRequestFailed(request, error, durationMs, context) }
+            notifyObservers { it.onRequestFailed(request, error, durationMs, context) }
             NetworkResult.Failure(error)
+        }
+    }
+
+    private inline fun notifyObservers(action: (NetworkEventObserver) -> Unit) {
+        observers.forEach { observer ->
+            try { action(observer) } catch (_: Throwable) { /* observer must not break pipeline */ }
         }
     }
 }

@@ -97,12 +97,17 @@ private fun evaluatePins(
         return PinEvaluation.Rejected
     }
 
+    // Fetch the certificate chain once — avoid re-calling SecTrustCopyCertificateChain per iteration.
+    val chainRef = SecTrustCopyCertificateChain(cfTrust)
+    val certChain = chainRef?.let { CFBridgingRelease(it.reinterpret()) as? List<*> }
+    if (certChain.isNullOrEmpty()) {
+        CFBridgingRelease(cfTrust.reinterpret())
+        return PinEvaluation.Rejected
+    }
+
     var pinMatched = false
-    for (i in 0 until certCount) {
-        val cert = SecTrustCopyCertificateChain(cfTrust)?.let { chain ->
-            val nsArray = CFBridgingRelease(chain.reinterpret()) as? List<*>
-            nsArray?.getOrNull(i.toInt())
-        } ?: continue
+    for (i in 0 until certCount.toInt()) {
+        val cert = certChain.getOrNull(i) ?: continue
 
         val certRef: SecCertificateRef = CFBridgingRetain(cert)?.reinterpret() ?: continue
         val certData = SecCertificateCopyData(certRef)

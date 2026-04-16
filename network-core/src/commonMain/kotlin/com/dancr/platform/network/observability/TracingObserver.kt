@@ -21,8 +21,7 @@ import com.dancr.platform.network.result.NetworkError
 //         request.copy(headers = request.headers + ("X-Trace-Id" to spanId))
 //     }
 class TracingObserver(
-    private val backend: TracingBackend = TracingBackend.NOOP,
-    private val tag: String = "Tracing"
+    private val backend: TracingBackend = TracingBackend.NOOP
 ) : NetworkEventObserver {
 
     override fun onRequestStarted(request: HttpRequest, context: RequestContext?) {

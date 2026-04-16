@@ -4,6 +4,7 @@ import com.dancr.platform.security.credential.Credential
 import com.dancr.platform.security.error.Diagnostic
 import com.dancr.platform.security.error.SecurityError
 import com.dancr.platform.security.store.SecretStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,6 +62,8 @@ class DefaultSessionController(
                 _events.emit(SessionEvent.RefreshFailed(error))
                 RefreshOutcome.Failed(error)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             val error = SecurityError.TokenRefreshFailed(
                 diagnostic = Diagnostic(
