@@ -1,7 +1,17 @@
 # Core Data Platform
 
-![Version](https://img.shields.io/badge/version-0.3.0-blue)
+![Version](https://img.shields.io/badge/version-0.3.1-blue)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.1.20-7f52ff)
 ![Maven Central](https://img.shields.io/maven-central/v/io.github.dancrrdz93/network-core)
+
+| Módulo | Maven Central |
+|---|---|
+| `network-core` | ![Maven Central](https://img.shields.io/maven-central/v/io.github.dancrrdz93/network-core) |
+| `network-ktor` | ![Maven Central](https://img.shields.io/maven-central/v/io.github.dancrrdz93/network-ktor) |
+| `network-ws-core` | ![Maven Central](https://img.shields.io/maven-central/v/io.github.dancrrdz93/network-ws-core) |
+| `network-ws-ktor` | ![Maven Central](https://img.shields.io/maven-central/v/io.github.dancrrdz93/network-ws-ktor) |
+| `security-core` | ![Maven Central](https://img.shields.io/maven-central/v/io.github.dancrrdz93/security-core) |
+| `sample-api` | ![Maven Central](https://img.shields.io/maven-central/v/io.github.dancrrdz93/sample-api) |
 
 **SDK Kotlin Multiplatform para Acceso Remoto Seguro de Datos**
 
@@ -102,20 +112,20 @@ repositories {
 
 dependencies {
     // Contratos core (siempre requeridos)
-    implementation("io.github.dancrrdz93:network-core:0.3.0")
+    implementation("io.github.dancrrdz93:network-core:0.3.1")
 
     // Implementación de transporte HTTP (elige uno)
-    implementation("io.github.dancrrdz93:network-ktor:0.3.0")
+    implementation("io.github.dancrrdz93:network-ktor:0.3.1")
 
     // WebSocket (si necesitas conexiones persistentes bidireccionales)
-    implementation("io.github.dancrrdz93:network-ws-core:0.3.0")
-    implementation("io.github.dancrrdz93:network-ws-ktor:0.3.0")
+    implementation("io.github.dancrrdz93:network-ws-core:0.3.1")
+    implementation("io.github.dancrrdz93:network-ws-ktor:0.3.1")
 
     // Seguridad (auth, almacenamiento seguro, gestión de sesiones)
-    implementation("io.github.dancrrdz93:security-core:0.3.0")
+    implementation("io.github.dancrrdz93:security-core:0.3.1")
 
     // Módulo de referencia (opcional — para ver el patrón de integración)
-    implementation("io.github.dancrrdz93:sample-api:0.3.0")
+    implementation("io.github.dancrrdz93:sample-api:0.3.1")
 }
 ```
 
@@ -345,9 +355,9 @@ Para diagramas de arquitectura, consulta el [índice de diagramas](docs/diagrams
 | `HttpEngine.healthCheck()` — liveness probing (default true, implementado en KtorHttpEngine) | `network-core` / `network-ktor` | ✅ Completado |
 | `SecretStore.keys()` + `putStringIfAbsent()` — migración/diagnóstico y escritura atómica | `security-core` | ✅ Completado |
 | Cleanup de TODOs redundantes — reclasificación de logging/caching/circuit-breaker | Todos | ✅ Completado |
-| Publicación en Maven Central | Todos | ✅ Completado (v0.3.0) |
+| Publicación en Maven Central | Todos | ✅ Completado (v0.3.1) |
 | Política de reintento circuit breaker | `network-core` | 🔴 No iniciado |
-| Soporte WebSocket con reconexión automática | `network-ws-core`, `network-ws-ktor` | ✅ Completado (v0.3.0) |
+| Soporte WebSocket con reconexión automática | `network-ws-core`, `network-ws-ktor` | ✅ Completado (v0.3.1) |
 | Primer módulo de dominio en producción | Nuevo módulo | 🔴 No iniciado |
 
 ---
