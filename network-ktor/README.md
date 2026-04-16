@@ -230,7 +230,7 @@ Cambia la dependencia en módulos de dominio de `:network-ktor` a `:network-okht
 | Limitación | Contexto |
 |---|---|
 | **Sin logging a nivel de transporte** | El plugin `Logging` de Ktor no está instalado. Todo el logging actualmente debe ir a través de `ResponseInterceptor` y `NetworkEventObserver` en `:network-core`. |
-| **Sin soporte de WebSocket** | `HttpEngine` es solo request-response. WebSocket necesitaría un contrato separado. |
+| **Sin soporte de WebSocket** | `HttpEngine` es solo request-response. WebSocket se maneja en módulos separados: `:network-ws-core` y `:network-ws-ktor`. |
 | **Sin subida multipart** | `HttpRequest.body` es un `ByteArray` plano. Multipart requeriría extender el modelo de request. |
 
 ---

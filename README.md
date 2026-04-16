@@ -1,6 +1,6 @@
 # Core Data Platform
 
-![Version](https://img.shields.io/badge/version-0.2.0-blue)
+![Version](https://img.shields.io/badge/version-0.3.0-blue)
 ![Maven Central](https://img.shields.io/maven-central/v/io.github.dancrrdz93/network-core)
 
 **SDK Kotlin Multiplatform para Acceso Remoto Seguro de Datos**
@@ -33,11 +33,14 @@ Una librería Kotlin Multiplatform (KMP) reutilizable y modular diseñada para p
 - [Guía Rápida para Android](docs/android-quickstart.md) — Primeros pasos para desarrolladores Android: contrato, adapter, DI (Hilt/Koin), NetworkResult, errores, auth, config, logging, paginación, retry por endpoint, y FAQ de seguridad
 - [Guía Rápida para iOS](docs/ios-quickstart.md) — Primeros pasos para desarrolladores iOS: protocolo, adapter, DI, NetworkResult, errores, auth, config, logging, paginación, retry por endpoint, y FAQ de seguridad
 - [Integración con Clean Architecture](docs/clean-architecture-integration.md) — Cómo usar el SDK exclusivamente en la capa `data`: estructura de carpetas, DTOs vs modelos de dominio, DataSource, Repository, DI, y referencias a escenarios avanzados
+- [Guía de Integración WebSocket — Servidor](docs/websocket-server-guide.md) — Protocolo WebSocket, tecnologías de servidor (Ktor, Spring, Node.js, Go, Python, .NET), servicios cloud administrados, patrones de comunicación, seguridad, y compatibilidad con el SDK
 
 ### READMEs de Módulos
 
 - [network-core](network-core/README.md) — Abstracciones puras de red, pipeline de ejecución, taxonomía de errores
 - [network-ktor](network-ktor/README.md) — Adaptador de transporte HTTP basado en Ktor
+- [network-ws-core](network-ws-core/README.md) — Abstracciones puras de WebSocket, pipeline de conexión, reconexión, errores
+- [network-ws-ktor](network-ws-ktor/README.md) — Adaptador de transporte WebSocket basado en Ktor
 - [security-core](security-core/README.md) — Credenciales, sesiones, almacenamiento seguro, confianza TLS, sanitización de logs
 - [sample-api](sample-api/README.md) — Módulo piloto de referencia para integración de API de dominio
 
@@ -99,16 +102,20 @@ repositories {
 
 dependencies {
     // Contratos core (siempre requeridos)
-    implementation("io.github.dancrrdz93:network-core:0.2.0")
+    implementation("io.github.dancrrdz93:network-core:0.3.0")
 
     // Implementación de transporte HTTP (elige uno)
-    implementation("io.github.dancrrdz93:network-ktor:0.2.0")
+    implementation("io.github.dancrrdz93:network-ktor:0.3.0")
+
+    // WebSocket (si necesitas conexiones persistentes bidireccionales)
+    implementation("io.github.dancrrdz93:network-ws-core:0.3.0")
+    implementation("io.github.dancrrdz93:network-ws-ktor:0.3.0")
 
     // Seguridad (auth, almacenamiento seguro, gestión de sesiones)
-    implementation("io.github.dancrrdz93:security-core:0.2.0")
+    implementation("io.github.dancrrdz93:security-core:0.3.0")
 
     // Módulo de referencia (opcional — para ver el patrón de integración)
-    implementation("io.github.dancrrdz93:sample-api:0.2.0")
+    implementation("io.github.dancrrdz93:sample-api:0.3.0")
 }
 ```
 
@@ -211,6 +218,8 @@ Los módulos del SDK se sitúan en la parte inferior del grafo de dependencias. 
 |---|---|---|---|
 | **`:network-core`** | Abstracciones puras de red: ejecución HTTP, errores, validación, reintentos, observabilidad | `HttpEngine`, `SafeRequestExecutor`, `NetworkResult<T>`, `NetworkError`, `NetworkEventObserver`, `LoggingObserver`, `NetworkLogger`, `RetryPolicy` | Solo `kotlinx-coroutines-core` |
 | **`:network-ktor`** | Adaptador de transporte HTTP. Encapsula Ktor completamente | `KtorHttpEngine`, `KtorErrorClassifier` | `:network-core`, `ktor-client-core`, `ktor-client-okhttp` (Android), `ktor-client-darwin` (iOS) |
+| **`:network-ws-core`** | Abstracciones puras de WebSocket: conexión, reconexión, errores, observabilidad | `WebSocketEngine`, `SafeWebSocketExecutor`, `WebSocketConnection`, `WebSocketError`, `ReconnectPolicy`, `WebSocketEventObserver` | Solo `kotlinx-coroutines-core` |
+| **`:network-ws-ktor`** | Adaptador de transporte WebSocket. Encapsula `ktor-client-websockets` completamente | `KtorWebSocketEngine`, `KtorWebSocketErrorClassifier` | `:network-ws-core`, `:security-core`, `ktor-client-core`, `ktor-client-websockets`, `ktor-client-okhttp` (Android), `ktor-client-darwin` (iOS) |
 | **`:security-core`** | Credenciales, sesiones, almacenamiento seguro, confianza TLS, sanitización de logs | `Credential`, `CredentialProvider`, `SessionController`, `SecretStore`, `TrustPolicy`, `LogSanitizer` | Solo `kotlinx-coroutines-core` |
 | **`:sample-api`** | Módulo piloto de referencia: demuestra el patrón DTO → Mapper → DataSource → Repository → Factory | `UserDto`, `User`, `UserMapper`, `UserRemoteDataSource`, `UserRepository`, `SampleApiFactory` | `:network-core`, `:network-ktor`, `:security-core`, `kotlinx-serialization-json` |
 
@@ -232,12 +241,17 @@ Los módulos del SDK se sitúan en la parte inferior del grafo de dependencias. 
 :sample-api ──▶ :security-core
 
 :network-ktor ──▶ :network-core
+:network-ktor ──▶ :security-core
+
+:network-ws-ktor ──▶ :network-ws-core
+:network-ws-ktor ──▶ :security-core
 
 :network-core ──▶ (ninguno)
+:network-ws-core ──▶ (ninguno)
 :security-core ──▶ (ninguno)
 ```
 
-**Invariante crítica:** `:network-core` y `:security-core` tienen **cero dependencia mutua**. Esto es por diseño y debe preservarse.
+**Invariante crítica:** `:network-core`, `:network-ws-core` y `:security-core` tienen **cero dependencia mutua**. Esto es por diseño y debe preservarse.
 
 ---
 
@@ -265,7 +279,8 @@ El 95%+ del código vive en `commonMain`. Solo `SecretStore` (Android Keystore /
 | `kotlinx-coroutines-core` | 1.10.1 | `network-core`, `security-core` |
 | `ktor-client-core` | 3.0.3 | `network-ktor` |
 | `ktor-client-okhttp` | 3.0.3 | `network-ktor` (Android) |
-| `ktor-client-darwin` | 3.0.3 | `network-ktor` (iOS) |
+| `ktor-client-darwin` | 3.0.3 | `network-ktor`, `network-ws-ktor` (iOS) |
+| `ktor-client-websockets` | 3.0.3 | `network-ws-ktor` |
 | `kotlinx-serialization-json` | 1.7.3 | `sample-api` (módulos de dominio) |
 
 ---
@@ -281,6 +296,8 @@ Para detalles técnicos de cada módulo (contratos, decisiones de diseño, exten
 
 - [network-core](network-core/README.md) — Pipeline de ejecución, errores, observabilidad
 - [network-ktor](network-ktor/README.md) — Transporte HTTP, certificate pinning
+- [network-ws-core](network-ws-core/README.md) — Pipeline WebSocket, reconexión, errores
+- [network-ws-ktor](network-ws-ktor/README.md) — Transporte WebSocket, certificate pinning
 - [security-core](security-core/README.md) — Credenciales, sesiones, almacenamiento seguro, TrustPolicy
 - [sample-api](sample-api/README.md) — Módulo de referencia
 
@@ -328,8 +345,9 @@ Para diagramas de arquitectura, consulta el [índice de diagramas](docs/diagrams
 | `HttpEngine.healthCheck()` — liveness probing (default true, implementado en KtorHttpEngine) | `network-core` / `network-ktor` | ✅ Completado |
 | `SecretStore.keys()` + `putStringIfAbsent()` — migración/diagnóstico y escritura atómica | `security-core` | ✅ Completado |
 | Cleanup de TODOs redundantes — reclasificación de logging/caching/circuit-breaker | Todos | ✅ Completado |
-| Publicación en Maven Central | Todos | ✅ Completado (v0.2.0) |
+| Publicación en Maven Central | Todos | ✅ Completado (v0.3.0) |
 | Política de reintento circuit breaker | `network-core` | 🔴 No iniciado |
+| Soporte WebSocket con reconexión automática | `network-ws-core`, `network-ws-ktor` | ✅ Completado (v0.3.0) |
 | Primer módulo de dominio en producción | Nuevo módulo | 🔴 No iniciado |
 
 ---
@@ -341,7 +359,7 @@ Consulta [`docs/security-checklist.md`](docs/security-checklist.md) para el chec
 
 | Categoría MASVS | Guardrail | Módulo |
 |---|---|---|
-| **NETWORK-1** — Solo HTTPS | `NetworkConfig` rechaza `http://` por defecto | `network-core` |
+| **NETWORK-1** — Solo HTTPS/WSS | `NetworkConfig` rechaza `http://` por defecto; `WebSocketConfig` rechaza `ws://` por defecto | `network-core`, `network-ws-core` |
 | **NETWORK-2** — Certificate Pinning | `TrustPolicy` → OkHttp / Darwin TLS | `network-ktor` |
 | **STORAGE-1** — Almacenamiento seguro | `SecretStore` → DataStore + Cipher + Keystore / Keychain | `security-core` |
 | **STORAGE-2** — No secretos en logs | `toString()` redactado en `Credential`, `HttpRequest`, `RawResponse`, `SessionCredentials` | `security-core`, `network-core` |

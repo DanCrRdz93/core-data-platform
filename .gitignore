@@ -35,3 +35,14 @@ local.properties
 /security-core/build/classes/kotlin/iosArm64/main/klib/
 /security-core/build/classes/kotlin/iosSimulatorArm64/main/klib/
 /security-core/build/classes/kotlin/iosX64/main/klib/
+/network-ws-core/build/
+/network-ws-core/build/classes/kotlin/android/main/
+/network-ws-core/build/classes/kotlin/iosArm64/main/klib/
+/network-ws-core/build/classes/kotlin/iosSimulatorArm64/main/klib/
+/network-ws-core/build/classes/kotlin/iosX64/main/klib/
+/network-ws-ktor/build/
+/network-ws-ktor/build/classes/kotlin/android/main/
+/network-ws-ktor/build/classes/kotlin/iosArm64/main/klib/
+/network-ws-ktor/build/classes/kotlin/iosSimulatorArm64/main/klib/
+/network-ws-ktor/build/classes/kotlin/iosX64/main/klib/
+/.kotlin/

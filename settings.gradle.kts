@@ -25,5 +25,7 @@ dependencyResolutionManagement {
 rootProject.name = "core-data-platform"
 include(":network-core")
 include(":network-ktor")
+include(":network-ws-core")
+include(":network-ws-ktor")
 include(":security-core")
 include(":sample-api")
