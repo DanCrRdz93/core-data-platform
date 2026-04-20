@@ -1,6 +1,6 @@
 # Core Data Platform
 
-![Version](https://img.shields.io/badge/version-0.3.1-blue)
+![Version](https://img.shields.io/badge/version-0.3.2-blue)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.1.20-7f52ff)
 ![Maven Central](https://img.shields.io/maven-central/v/io.github.dancrrdz93/network-core)
 
@@ -112,20 +112,20 @@ repositories {
 
 dependencies {
     // Contratos core (siempre requeridos)
-    implementation("io.github.dancrrdz93:network-core:0.3.1")
+    implementation("io.github.dancrrdz93:network-core:0.3.2")
 
     // Implementación de transporte HTTP (elige uno)
-    implementation("io.github.dancrrdz93:network-ktor:0.3.1")
+    implementation("io.github.dancrrdz93:network-ktor:0.3.2")
 
     // WebSocket (si necesitas conexiones persistentes bidireccionales)
-    implementation("io.github.dancrrdz93:network-ws-core:0.3.1")
-    implementation("io.github.dancrrdz93:network-ws-ktor:0.3.1")
+    implementation("io.github.dancrrdz93:network-ws-core:0.3.2")
+    implementation("io.github.dancrrdz93:network-ws-ktor:0.3.2")
 
     // Seguridad (auth, almacenamiento seguro, gestión de sesiones)
-    implementation("io.github.dancrrdz93:security-core:0.3.1")
+    implementation("io.github.dancrrdz93:security-core:0.3.2")
 
     // Módulo de referencia (opcional — para ver el patrón de integración)
-    implementation("io.github.dancrrdz93:sample-api:0.3.1")
+    implementation("io.github.dancrrdz93:sample-api:0.3.2")
 }
 ```
 
@@ -355,9 +355,9 @@ Para diagramas de arquitectura, consulta el [índice de diagramas](docs/diagrams
 | `HttpEngine.healthCheck()` — liveness probing (default true, implementado en KtorHttpEngine) | `network-core` / `network-ktor` | ✅ Completado |
 | `SecretStore.keys()` + `putStringIfAbsent()` — migración/diagnóstico y escritura atómica | `security-core` | ✅ Completado |
 | Cleanup de TODOs redundantes — reclasificación de logging/caching/circuit-breaker | Todos | ✅ Completado |
-| Publicación en Maven Central | Todos | ✅ Completado (v0.3.1) |
+| Publicación en Maven Central | Todos | ✅ Completado (v0.3.2) |
 | Política de reintento circuit breaker | `network-core` | 🔴 No iniciado |
-| Soporte WebSocket con reconexión automática | `network-ws-core`, `network-ws-ktor` | ✅ Completado (v0.3.1) |
+| Soporte WebSocket con reconexión automática | `network-ws-core`, `network-ws-ktor` | ✅ Completado (v0.3.2) |
 | Primer módulo de dominio en producción | Nuevo módulo | 🔴 No iniciado |
 
 ---
