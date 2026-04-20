@@ -8,12 +8,30 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
+/**
+ * AES-256-GCM encryption manager backed by the Android Keystore.
+ *
+ * Keys are hardware-backed (when available) and never leave the Keystore.
+ * Encrypted data format: `[ivLength (1 byte)] [iv] [ciphertext + GCM tag]`.
+ *
+ * **Example:**
+ * ```kotlin
+ * val crypto = CryptoManager(keyAlias = "my_app_key")
+ *
+ * val encrypted = crypto.encryptString("secret-token")
+ * val decrypted = crypto.decryptString(encrypted) // "secret-token"
+ * ```
+ *
+ * @param keyAlias The Android Keystore alias for the AES key.
+ * @see AndroidSecretStore for the [SecretStore] implementation that uses this.
+ */
 internal class CryptoManager(
     private val keyAlias: String = DEFAULT_KEY_ALIAS
 ) {
 
     private val keyStore: KeyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
 
+    /** Encrypts [plaintext] and returns `[ivLength][iv][ciphertext]`. */
     fun encrypt(plaintext: ByteArray): ByteArray {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
@@ -23,6 +41,7 @@ internal class CryptoManager(
         return byteArrayOf(iv.size.toByte()) + iv + ciphertext
     }
 
+    /** Decrypts data previously produced by [encrypt]. */
     fun decrypt(encryptedData: ByteArray): ByteArray {
         require(encryptedData.size > 1) { "Encrypted data too short to contain IV length prefix" }
         val ivLength = encryptedData[0].toInt()
@@ -34,9 +53,11 @@ internal class CryptoManager(
         return cipher.doFinal(ciphertext)
     }
 
+    /** Convenience: encrypts a UTF-8 string. */
     fun encryptString(plaintext: String): ByteArray =
         encrypt(plaintext.toByteArray(Charsets.UTF_8))
 
+    /** Convenience: decrypts to a UTF-8 string. */
     fun decryptString(encryptedData: ByteArray): String =
         String(decrypt(encryptedData), Charsets.UTF_8)
 

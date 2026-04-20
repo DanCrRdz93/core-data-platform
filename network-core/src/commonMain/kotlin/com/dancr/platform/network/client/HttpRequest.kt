@@ -1,5 +1,38 @@
 package com.dancr.platform.network.client
 
+/**
+ * Immutable HTTP request descriptor.
+ *
+ * The [path] is relative to the base URL configured in
+ * [NetworkConfig][com.dancr.platform.network.config.NetworkConfig]; the executor
+ * merges them before sending. The [toString] override redacts header values
+ * (OWASP MASVS-STORAGE-2).
+ *
+ * **Example — creating a GET request:**
+ * ```kotlin
+ * val request = HttpRequest(
+ *     path = "/users/42",
+ *     method = HttpMethod.GET,
+ *     headers = mapOf("Accept" to "application/json")
+ * )
+ * ```
+ *
+ * **Example — creating a POST request with body:**
+ * ```kotlin
+ * val request = HttpRequest(
+ *     path = "/users",
+ *     method = HttpMethod.POST,
+ *     headers = mapOf("Content-Type" to "application/json"),
+ *     body = """{ "name": "Alice" }""".encodeToByteArray()
+ * )
+ * ```
+ *
+ * @property path        Relative path appended to the base URL.
+ * @property method      HTTP method (GET, POST, PUT, etc.).
+ * @property headers     Request headers (merged with default headers from config).
+ * @property queryParams Query parameters appended to the URL.
+ * @property body        Optional request body as raw bytes.
+ */
 data class HttpRequest(
     val path: String,
     val method: HttpMethod,

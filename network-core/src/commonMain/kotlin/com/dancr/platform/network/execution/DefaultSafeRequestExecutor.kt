@@ -15,6 +15,41 @@ import kotlinx.coroutines.delay
 import kotlin.math.pow
 import kotlin.time.TimeSource
 
+/**
+ * Default [SafeRequestExecutor] implementing the full request pipeline:
+ *
+ * 1. **Prepare** — merge base URL + default headers, run [RequestInterceptor]s.
+ * 2. **Transport** — delegate to [HttpEngine].
+ * 3. **Response intercept** — run [ResponseInterceptor]s.
+ * 4. **Validate** — check via [ResponseValidator].
+ * 5. **Deserialize** — convert [RawResponse] to `T`.
+ * 6. **Retry** — repeat on retryable failures per [RetryPolicy].
+ * 7. **Observe** — notify [NetworkEventObserver]s at each lifecycle point.
+ *
+ * Every request returns a [NetworkResult] — never throws (except [CancellationException]).
+ *
+ * **Example — wiring the executor:**
+ * ```kotlin
+ * val executor = DefaultSafeRequestExecutor(
+ *     engine = KtorHttpEngine.create(config),
+ *     config = NetworkConfig(baseUrl = "https://api.example.com"),
+ *     interceptors = listOf(authInterceptor, tracingInterceptor),
+ *     responseInterceptors = listOf(rateLimitInterceptor),
+ *     observers = listOf(LoggingObserver(logger), MetricsObserver(collector)),
+ *     classifier = KtorErrorClassifier()
+ * )
+ * ```
+ *
+ * @param engine               The transport layer.
+ * @param config               Network configuration (base URL, timeouts, default retry).
+ * @param validator            Response validator (default: 2xx = valid).
+ * @param classifier           Error classifier (default: heuristic-based).
+ * @param interceptors         Pre-transport request interceptors (executed in order).
+ * @param responseInterceptors Post-transport response interceptors (executed in order).
+ * @param observers            Lifecycle observers for logging, metrics, and tracing.
+ *
+ * @see SafeRequestExecutor
+ */
 class DefaultSafeRequestExecutor(
     private val engine: HttpEngine,
     private val config: NetworkConfig,

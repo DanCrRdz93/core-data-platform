@@ -14,6 +14,29 @@ import platform.CoreFoundation.CFTypeRefVar
 import platform.Foundation.*
 import platform.Security.*
 
+/**
+ * iOS [SecretStore] implementation backed by the Keychain Services API.
+ *
+ * All values are stored as `kSecClassGenericPassword` items, scoped by
+ * [KeychainConfig.serviceName] and optional [KeychainConfig.accessGroup].
+ *
+ * **Example:**
+ * ```kotlin
+ * val store = IosSecretStore(
+ *     config = KeychainConfig(
+ *         serviceName = "com.myapp.security",
+ *         accessibility = KeychainAccessibility.WHEN_UNLOCKED
+ *     )
+ * )
+ *
+ * store.putString("refresh_token", "eyJhbG...")
+ * val token = store.getString("refresh_token")
+ * ```
+ *
+ * @param config Keychain configuration (service name, access group, accessibility).
+ * @see SecretStore
+ * @see KeychainConfig
+ */
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 class IosSecretStore(
     private val config: KeychainConfig = KeychainConfig()

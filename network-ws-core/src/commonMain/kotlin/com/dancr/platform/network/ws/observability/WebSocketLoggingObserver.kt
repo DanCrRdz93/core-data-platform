@@ -4,8 +4,35 @@ import com.dancr.platform.network.ws.client.WebSocketFrame
 import com.dancr.platform.network.ws.client.WebSocketRequest
 import com.dancr.platform.network.ws.error.WebSocketError
 
-// Built-in observer that logs WebSocket lifecycle events.
-// OWASP MASVS-PRIVACY: header values are redacted by default.
+/**
+ * Built-in [WebSocketEventObserver] that logs WebSocket lifecycle events.
+ *
+ * Header values are redacted by default (OWASP MASVS-PRIVACY). Provide a
+ * custom [headerSanitizer] to selectively reveal safe headers.
+ *
+ * **Example:**
+ * ```kotlin
+ * val observer = WebSocketLoggingObserver(
+ *     logger = logcatWsLogger,
+ *     tag = "ChatWS",
+ *     headerSanitizer = { key, value ->
+ *         if (key.equals("Accept", ignoreCase = true)) value else "██"
+ *     }
+ * )
+ *
+ * val executor = DefaultSafeWebSocketExecutor(
+ *     engine = engine,
+ *     config = config,
+ *     observers = listOf(observer)
+ * )
+ * ```
+ *
+ * @param logger          The [WebSocketLogger] backend for log output.
+ * @param tag             Log tag used for all messages.
+ * @param headerSanitizer Function that redacts header values for safe logging.
+ * @see WebSocketLogger
+ * @see WebSocketEventObserver
+ */
 class WebSocketLoggingObserver(
     private val logger: WebSocketLogger = WebSocketLogger.NOOP,
     private val tag: String = "WebSocket",

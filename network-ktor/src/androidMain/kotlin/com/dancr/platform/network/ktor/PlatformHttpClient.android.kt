@@ -7,6 +7,12 @@ import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import okhttp3.CertificatePinner
 
+/**
+ * Android implementation using the OkHttp engine.
+ *
+ * Configures timeouts from [NetworkConfig] and applies certificate pinning
+ * via OkHttp's [CertificatePinner] when a [TrustPolicy] is provided.
+ */
 internal actual fun createPlatformHttpClient(
     config: NetworkConfig,
     trustPolicy: TrustPolicy?
@@ -32,10 +38,13 @@ internal actual fun createPlatformHttpClient(
     }
 }
 
-// Maps TrustPolicy pins to OkHttp's CertificatePinner.
-// Pin format follows OkHttp convention: "algorithm/base64hash"
-// Example: CertificatePin(algorithm = "sha256", hash = "AAAA...=")
-//          → OkHttp pin string "sha256/AAAA...="
+/**
+ * Maps [TrustPolicy] pins to OkHttp's [CertificatePinner].
+ *
+ * Pin format follows OkHttp convention: `"algorithm/base64hash"`.
+ * Example: `CertificatePin(algorithm = "sha256", hash = "AAAA...=")`
+ * → OkHttp pin string `"sha256/AAAA...="``
+ */
 private fun buildCertificatePinner(
     pins: Map<String, Set<com.dancr.platform.security.trust.CertificatePin>>
 ): CertificatePinner = CertificatePinner.Builder().apply {

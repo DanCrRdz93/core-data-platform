@@ -5,21 +5,30 @@ import com.dancr.platform.network.client.RawResponse
 import com.dancr.platform.network.execution.RequestContext
 import com.dancr.platform.network.result.NetworkError
 
-// Observes network lifecycle events and delegates trace context to a TracingBackend.
-// Generates span/trace IDs and records them alongside request metadata.
-// No-op by default — the consumer controls the tracing backend.
-//
-// The observer generates IDs and reports them to the backend. It does NOT mutate
-// the request (header propagation is the responsibility of a RequestInterceptor
-// that reads parentSpanId from RequestContext).
-//
-// Typical setup:
-//     val tracingObserver = TracingObserver(backend = myOpenTelemetryBackend)
-//     // Pair with a RequestInterceptor that propagates trace headers:
-//     val tracingInterceptor = RequestInterceptor { request, context ->
-//         val spanId = context?.parentSpanId ?: ""
-//         request.copy(headers = request.headers + ("X-Trace-Id" to spanId))
-//     }
+/**
+ * Observes network lifecycle events and delegates trace context to a [TracingBackend].
+ *
+ * Generates span / trace IDs and records them alongside request metadata.
+ * The observer **does not** mutate the request — header propagation is the
+ * responsibility of a [RequestInterceptor] that reads `parentSpanId` from
+ * [RequestContext][com.dancr.platform.network.execution.RequestContext].
+ *
+ * **Example — typical setup:**
+ * ```kotlin
+ * val tracingObserver = TracingObserver(backend = myOpenTelemetryBackend)
+ *
+ * // Pair with a RequestInterceptor that propagates trace headers:
+ * val tracingInterceptor = RequestInterceptor { request, context ->
+ *     val spanId = context?.parentSpanId ?: ""
+ *     request.copy(headers = request.headers + ("X-Trace-Id" to spanId))
+ * }
+ * ```
+ *
+ * @param backend The tracing backend (default: [TracingBackend.NOOP]).
+ *
+ * @see TracingBackend
+ * @see NetworkEventObserver
+ */
 class TracingObserver(
     private val backend: TracingBackend = TracingBackend.NOOP
 ) : NetworkEventObserver {

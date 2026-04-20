@@ -1,7 +1,30 @@
 package com.dancr.platform.network.ws.client
 
-// Represents a WebSocket frame. Only data frames are exposed to consumers.
-// Control frames (Ping/Pong) are handled at the engine level — never leaked.
+/**
+ * Represents a WebSocket data frame.
+ *
+ * Only data frames ([Text], [Binary]) and [Close] frames are exposed to consumers.
+ * Control frames (Ping/Pong) are handled at the engine level and never leaked.
+ *
+ * **Example — receiving frames:**
+ * ```kotlin
+ * session.incoming.collect { frame ->
+ *     when (frame) {
+ *         is WebSocketFrame.Text   -> processJson(frame.text)
+ *         is WebSocketFrame.Binary -> processBinary(frame.data)
+ *         is WebSocketFrame.Close  -> log("Closed: ${frame.code} ${frame.reason}")
+ *     }
+ * }
+ * ```
+ *
+ * **Example — sending frames:**
+ * ```kotlin
+ * session.send(WebSocketFrame.Text("{\"type\":\"ping\"}"))
+ * session.send(WebSocketFrame.Binary(byteArrayOf(0x01, 0x02)))
+ * ```
+ *
+ * @see WebSocketSession for frame sending/receiving.
+ */
 sealed class WebSocketFrame {
 
     data class Text(val text: String) : WebSocketFrame() {

@@ -1,5 +1,26 @@
 package com.dancr.platform.network.client
 
+/**
+ * Raw HTTP response returned by [HttpEngine.execute].
+ *
+ * Contains the unprocessed status code, headers, and body bytes. The executor
+ * validates and deserializes this into a typed [NetworkResult][com.dancr.platform.network.result.NetworkResult].
+ * The [toString] override redacts header values and truncates the body (OWASP MASVS-STORAGE-2).
+ *
+ * **Example — inspecting a raw response:**
+ * ```kotlin
+ * val response: RawResponse = engine.execute(request)
+ *
+ * if (response.isSuccessful) {
+ *     val json = response.body?.decodeToString()
+ *     val contentType = response.contentType // e.g. "application/json"
+ * }
+ * ```
+ *
+ * @property statusCode HTTP status code (e.g. 200, 404, 500).
+ * @property headers    Response headers as a multi-value map.
+ * @property body       Optional response body as raw bytes.
+ */
 data class RawResponse(
     val statusCode: Int,
     val headers: Map<String, List<String>> = emptyMap(),

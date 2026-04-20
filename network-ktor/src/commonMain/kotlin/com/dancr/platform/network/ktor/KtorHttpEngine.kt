@@ -17,6 +17,28 @@ import io.ktor.http.content.ByteArrayContent
 import kotlinx.coroutines.Job
 import io.ktor.http.HttpMethod as KtorHttpMethod
 
+/**
+ * [HttpEngine] implementation backed by a Ktor [HttpClient].
+ *
+ * Maps SDK [HttpRequest] to Ktor requests and converts responses back to [RawResponse].
+ * Supports platform-specific TLS certificate pinning via [createPlatformHttpClient].
+ *
+ * **Example — creating with certificate pinning:**
+ * ```kotlin
+ * val engine = KtorHttpEngine.create(
+ *     config = NetworkConfig(baseUrl = "https://api.example.com"),
+ *     trustPolicy = DefaultTrustPolicy(
+ *         pins = mapOf("api.example.com" to setOf(CertificatePin("sha256", "AAAA...=")))
+ *     )
+ * )
+ *
+ * val result = engine.execute(HttpRequest(path = "/users", method = HttpMethod.GET))
+ * ```
+ *
+ * @param client The platform-configured Ktor [HttpClient].
+ * @see HttpEngine
+ * @see KtorErrorClassifier for Ktor-specific error classification.
+ */
 class KtorHttpEngine(
     private val client: HttpClient
 ) : HttpEngine {
@@ -65,11 +87,19 @@ class KtorHttpEngine(
 
     companion object {
 
-        // Creates a KtorHttpEngine with platform-appropriate TLS configuration.
-        // When trustPolicy is non-null, certificate pinning is enforced:
-        //  - Android (OkHttp): via CertificatePinner
-        //  - iOS (Darwin): via handleChallenge with SecTrust evaluation
-        // When trustPolicy is null, system default trust is used (no pinning).
+        /**
+         * Creates a [KtorHttpEngine] with platform-appropriate TLS configuration.
+         *
+         * When [trustPolicy] is non-null, certificate pinning is enforced:
+         * - **Android** (OkHttp): via `CertificatePinner`
+         * - **iOS** (Darwin): via `handleChallenge` with `SecTrust` evaluation
+         *
+         * When [trustPolicy] is `null`, system default trust is used (no pinning).
+         *
+         * @param config      Network configuration (base URL, timeouts).
+         * @param trustPolicy Optional TLS pinning policy.
+         * @return A configured [KtorHttpEngine] instance.
+         */
         fun create(
             config: NetworkConfig,
             trustPolicy: TrustPolicy? = null

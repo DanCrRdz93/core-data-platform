@@ -8,6 +8,12 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.websocket.WebSockets
 import okhttp3.CertificatePinner
 
+/**
+ * Android implementation using the OkHttp engine with WebSocket support.
+ *
+ * Configures ping interval and connect timeout from [WebSocketConfig], and applies
+ * certificate pinning via OkHttp's [CertificatePinner] when a [TrustPolicy] is provided.
+ */
 internal actual fun createPlatformWebSocketClient(
     config: WebSocketConfig,
     trustPolicy: TrustPolicy?

@@ -14,6 +14,23 @@ import com.dancr.platform.sample.datasource.UserRemoteDataSource
 import com.dancr.platform.sample.repository.UserRepository
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * Factory that wires the full sample API stack: engine → executor → data source → repository.
+ *
+ * Demonstrates end-to-end integration of `network-core`, `network-ktor`, and `security-core`
+ * with optional credential injection, certificate pinning, and observability.
+ *
+ * **Example:**
+ * ```kotlin
+ * val repo = SampleApiFactory.create(
+ *     credentialProvider = myCredentialProvider,
+ *     trustPolicy = myTrustPolicy,
+ *     observers = listOf(LoggingObserver(logger), MetricsObserver(collector))
+ * )
+ *
+ * val result = repo.getUsers()
+ * ```
+ */
 object SampleApiFactory {
 
     private val defaultConfig = NetworkConfig(

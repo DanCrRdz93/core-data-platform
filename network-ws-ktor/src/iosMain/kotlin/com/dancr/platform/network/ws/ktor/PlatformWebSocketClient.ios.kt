@@ -12,6 +12,12 @@ import platform.CoreFoundation.CFDataGetLength
 import platform.Foundation.*
 import platform.Security.*
 
+/**
+ * iOS implementation using the Darwin (NSURLSession) engine with WebSocket support.
+ *
+ * Configures ping interval and connect timeout from [WebSocketConfig], and applies
+ * certificate pinning via `handleChallenge` with `SecTrust` evaluation when a [TrustPolicy] is provided.
+ */
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 internal actual fun createPlatformWebSocketClient(
     config: WebSocketConfig,

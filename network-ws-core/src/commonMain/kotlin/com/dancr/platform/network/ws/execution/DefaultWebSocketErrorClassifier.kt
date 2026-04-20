@@ -3,9 +3,21 @@ package com.dancr.platform.network.ws.execution
 import com.dancr.platform.network.ws.error.WebSocketError
 import com.dancr.platform.network.ws.result.Diagnostic
 
-// Default classifier for transport-agnostic exceptions.
-// Transport modules (e.g. KtorWebSocketErrorClassifier) extend this
-// to handle library-specific exception types first, then fall back here.
+/**
+ * Default [WebSocketErrorClassifier] using message-based heuristics.
+ *
+ * Transport modules (e.g. `KtorWebSocketErrorClassifier`) extend this to handle
+ * library-specific exception types first, then fall back to the heuristics here.
+ *
+ * **Example:**
+ * ```kotlin
+ * val classifier = DefaultWebSocketErrorClassifier()
+ * val error = classifier.classify(SocketTimeoutException("timed out"))
+ * // → WebSocketError.Timeout
+ * ```
+ *
+ * @see WebSocketErrorClassifier
+ */
 open class DefaultWebSocketErrorClassifier : WebSocketErrorClassifier {
 
     override fun classify(cause: Throwable): WebSocketError {

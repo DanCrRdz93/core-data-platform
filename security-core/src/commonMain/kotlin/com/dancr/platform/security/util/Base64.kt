@@ -1,9 +1,27 @@
 package com.dancr.platform.security.util
 
+/**
+ * Pure-Kotlin Base64 encoder (no platform dependencies).
+ *
+ * Used internally by [CredentialHeaderMapper][com.dancr.platform.security.credential.CredentialHeaderMapper]
+ * for HTTP Basic authentication encoding.
+ *
+ * **Example:**
+ * ```kotlin
+ * val encoded = Base64.encode("hello".encodeToByteArray()) // "aGVsbG8="
+ * val fromStr = Base64.encodeToString("user:pass")          // "dXNlcjpwYXNz"
+ * ```
+ */
 object Base64 {
 
     private const val ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
+    /**
+     * Encodes [bytes] to a Base64 string.
+     *
+     * @param bytes The raw bytes to encode.
+     * @return Base64-encoded string with `=` padding.
+     */
     fun encode(bytes: ByteArray): String {
         val sb = StringBuilder()
         var i = 0
@@ -20,5 +38,11 @@ object Base64 {
         return sb.toString()
     }
 
+    /**
+     * Convenience: encodes a UTF-8 [value] string to Base64.
+     *
+     * @param value The string to encode.
+     * @return Base64-encoded representation of the UTF-8 bytes.
+     */
     fun encodeToString(value: String): String = encode(value.encodeToByteArray())
 }

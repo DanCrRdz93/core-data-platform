@@ -11,7 +11,14 @@ import kotlin.test.assertFails
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-// OWASP MASVS-aligned security guardrail tests for network-core.
+/**
+ * OWASP MASVS-aligned security guardrail tests for network-core.
+ *
+ * Verifies:
+ * - HTTPS enforcement in [NetworkConfig] (MASVS-NETWORK-1)
+ * - `toString()` redaction in [HttpRequest] and [RawResponse] (MASVS-STORAGE / MASVS-PRIVACY)
+ * - Default header sanitization in [LoggingObserver]
+ */
 class NetworkSecurityGuardrailsTest {
 
     // -- NetworkConfig HTTPS enforcement (MASVS-NETWORK-1) --

@@ -5,13 +5,30 @@ import com.dancr.platform.network.client.RawResponse
 import com.dancr.platform.network.execution.RequestContext
 import com.dancr.platform.network.result.NetworkError
 
-// Observes network lifecycle events and delegates formatted output to a NetworkLogger.
-// Keeps formatting minimal — the consumer controls the logging backend and verbosity.
-//
-// OWASP MASVS-PRIVACY: headerSanitizer defaults to REDACT ALL values.
-// The safe path is the default — no sensitive data leaks unless the consumer
-// explicitly provides a sanitizer. Wire security-core's DefaultLogSanitizer:
-//     headerSanitizer = { key, value -> logSanitizer.sanitize(key, value) }
+/**
+ * Observes network lifecycle events and delegates formatted output to a [NetworkLogger].
+ *
+ * Keeps formatting minimal — the consumer controls the logging backend and verbosity.
+ *
+ * > **OWASP MASVS-PRIVACY:** [headerSanitizer] defaults to [REDACT_ALL] — no sensitive
+ * > data leaks unless the consumer explicitly provides a sanitizer.
+ *
+ * **Example — wiring with security-core's sanitizer:**
+ * ```kotlin
+ * val sanitizer = DefaultLogSanitizer()
+ * val observer = LoggingObserver(
+ *     logger = androidLogger,
+ *     headerSanitizer = { key, value -> sanitizer.sanitize(key, value) }
+ * )
+ * ```
+ *
+ * @param logger          The logging backend (default: [NetworkLogger.NOOP]).
+ * @param tag             Logging tag (default: `"CoreDataPlatform"`).
+ * @param headerSanitizer Function to redact header values before logging.
+ *
+ * @see NetworkLogger
+ * @see NetworkEventObserver
+ */
 class LoggingObserver(
     private val logger: NetworkLogger = NetworkLogger.NOOP,
     private val tag: String = "CoreDataPlatform",

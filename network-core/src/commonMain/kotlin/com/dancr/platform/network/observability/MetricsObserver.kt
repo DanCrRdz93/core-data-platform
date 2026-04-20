@@ -5,9 +5,26 @@ import com.dancr.platform.network.client.RawResponse
 import com.dancr.platform.network.execution.RequestContext
 import com.dancr.platform.network.result.NetworkError
 
-// Observes network lifecycle events and delegates metrics to a MetricsCollector.
-// Records request latency, error counts, and retry counts.
-// No-op by default — the consumer controls the metrics backend.
+/**
+ * Observes network lifecycle events and records metrics via a [MetricsCollector].
+ *
+ * Records request latency, error counts, and retry counts. Tags include HTTP method,
+ * sanitized path, status code, and operation ID (when available).
+ *
+ * **Example:**
+ * ```kotlin
+ * val observer = MetricsObserver(
+ *     collector = myDatadogCollector,
+ *     prefix = "http.client" // metric names: http.client.requests.started, etc.
+ * )
+ * ```
+ *
+ * @param collector The metrics backend (default: [MetricsCollector.NOOP]).
+ * @param prefix    Metric name prefix (default: `"http.client"`).
+ *
+ * @see MetricsCollector
+ * @see NetworkEventObserver
+ */
 class MetricsObserver(
     private val collector: MetricsCollector = MetricsCollector.NOOP,
     private val prefix: String = "http.client"

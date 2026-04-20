@@ -8,6 +8,20 @@ import com.dancr.platform.network.result.NetworkResult
 import com.dancr.platform.sample.dto.UserDto
 import kotlinx.serialization.json.Json
 
+/**
+ * Data source for the JSONPlaceholder `/users` endpoint.
+ *
+ * Demonstrates how to extend [RemoteDataSource] with typed request methods.
+ *
+ * **Example:**
+ * ```kotlin
+ * val dataSource = UserRemoteDataSource(executor)
+ * val result: NetworkResult<List<UserDto>> = dataSource.fetchUsers()
+ * ```
+ *
+ * @param executor The [SafeRequestExecutor] that handles transport, retry, and error classification.
+ * @see RemoteDataSource
+ */
 class UserRemoteDataSource(
     executor: SafeRequestExecutor
 ) : RemoteDataSource(executor) {

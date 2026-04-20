@@ -27,6 +27,36 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
+/**
+ * Default [SafeWebSocketExecutor] implementation that orchestrates:
+ *
+ * 1. **Request preparation** — merges base URL + default headers from [WebSocketConfig].
+ * 2. **Interception** — applies [WebSocketInterceptor]s (auth headers, tracing context).
+ * 3. **Connection** — delegates to [WebSocketEngine.connect].
+ * 4. **Reconnection** — automatic reconnection with [ReconnectPolicy].
+ * 5. **Error classification** — transport exceptions → [WebSocketError] via [WebSocketErrorClassifier].
+ * 6. **Observability** — notifies [WebSocketEventObserver]s on lifecycle events.
+ *
+ * **Example:**
+ * ```kotlin
+ * val executor = DefaultSafeWebSocketExecutor(
+ *     engine = KtorWebSocketEngine.create(config, trustPolicy),
+ *     config = WebSocketConfig(url = "wss://ws.example.com"),
+ *     classifier = KtorWebSocketErrorClassifier(),
+ *     interceptors = listOf(authInterceptor),
+ *     observers = listOf(WebSocketLoggingObserver(logger))
+ * )
+ *
+ * val connection = executor.connect(WebSocketRequest(path = "/stream"))
+ * ```
+ *
+ * @param engine       The raw WebSocket transport engine.
+ * @param config       WebSocket configuration (URL, timeouts, reconnect policy).
+ * @param classifier   Error classifier for transport exceptions.
+ * @param interceptors Request interceptors applied in order before connecting.
+ * @param observers    Lifecycle observers notified on connect, disconnect, frame, and reconnect events.
+ * @see SafeWebSocketExecutor
+ */
 class DefaultSafeWebSocketExecutor(
     private val engine: WebSocketEngine,
     private val config: WebSocketConfig,
@@ -63,9 +93,12 @@ class DefaultSafeWebSocketExecutor(
     }
 }
 
-// Internal managed connection with automatic reconnection.
-// Uses a Channel for backpressure-aware frame delivery and a dedicated
-// CoroutineScope for the connection loop.
+/**
+ * Internal managed connection with automatic reconnection.
+ *
+ * Uses a [Channel] for backpressure-aware frame delivery and a dedicated
+ * [CoroutineScope] for the connection loop.
+ */
 internal class ManagedWebSocketConnection(
     private val engine: WebSocketEngine,
     private val config: WebSocketConfig,

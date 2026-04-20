@@ -18,6 +18,29 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.isActive
 
+/**
+ * [WebSocketEngine] implementation backed by a Ktor [HttpClient] with WebSocket support.
+ *
+ * Adapts Ktor's `DefaultWebSocketSession` to the SDK's [WebSocketSession] contract.
+ * Ping/Pong frames are handled by Ktor internally — only data frames are exposed.
+ *
+ * **Example — creating with certificate pinning:**
+ * ```kotlin
+ * val engine = KtorWebSocketEngine.create(
+ *     config = WebSocketConfig(url = "wss://ws.example.com"),
+ *     trustPolicy = DefaultTrustPolicy(
+ *         pins = mapOf("ws.example.com" to setOf(CertificatePin("sha256", "AAAA...=")))
+ *     )
+ * )
+ *
+ * val session = engine.connect(WebSocketRequest(path = "/stream"))
+ * session.incoming.collect { frame -> processFrame(frame) }
+ * ```
+ *
+ * @param client The platform-configured Ktor [HttpClient] with WebSocket plugin.
+ * @see WebSocketEngine
+ * @see KtorWebSocketErrorClassifier for Ktor-specific error classification.
+ */
 class KtorWebSocketEngine(
     private val client: HttpClient
 ) : WebSocketEngine {
@@ -40,11 +63,19 @@ class KtorWebSocketEngine(
 
     companion object {
 
-        // Creates a KtorWebSocketEngine with platform-appropriate TLS configuration.
-        // When trustPolicy is non-null, certificate pinning is enforced:
-        //  - Android (OkHttp): via CertificatePinner
-        //  - iOS (Darwin): via handleChallenge with SecTrust evaluation
-        // When trustPolicy is null, system default trust is used (no pinning).
+        /**
+         * Creates a [KtorWebSocketEngine] with platform-appropriate TLS configuration.
+         *
+         * When [trustPolicy] is non-null, certificate pinning is enforced:
+         * - **Android** (OkHttp): via `CertificatePinner`
+         * - **iOS** (Darwin): via `handleChallenge` with `SecTrust` evaluation
+         *
+         * When [trustPolicy] is `null`, system default trust is used (no pinning).
+         *
+         * @param config      WebSocket configuration (URL, timeouts, ping interval).
+         * @param trustPolicy Optional TLS pinning policy.
+         * @return A configured [KtorWebSocketEngine] instance.
+         */
         fun create(
             config: WebSocketConfig,
             trustPolicy: TrustPolicy? = null
@@ -55,8 +86,10 @@ class KtorWebSocketEngine(
     }
 }
 
-// Adapts Ktor's DefaultWebSocketSession to the SDK's WebSocketSession contract.
-// Ping/Pong frames are handled by Ktor internally — only data frames are exposed.
+/**
+ * Adapts Ktor's [DefaultWebSocketSession] to the SDK's [WebSocketSession] contract.
+ * Ping/Pong frames are handled by Ktor internally — only data frames are exposed.
+ */
 private class KtorWebSocketSession(
     private val session: DefaultWebSocketSession
 ) : WebSocketSession {

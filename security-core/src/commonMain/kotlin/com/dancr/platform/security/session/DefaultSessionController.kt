@@ -14,6 +14,42 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+/**
+ * Default [SessionController] implementation backed by a [SecretStore].
+ *
+ * All operations are mutex-guarded to ensure thread-safe state transitions.
+ * Credentials are persisted to the [store] so sessions survive process restarts.
+ *
+ * **Example — creating with a refresh-token provider:**
+ * ```kotlin
+ * val controller = DefaultSessionController(
+ *     store = AndroidSecretStore(context),
+ *     refreshTokenProvider = { refreshToken ->
+ *         val response = authApi.refresh(refreshToken)
+ *         SessionCredentials(
+ *             credential = Credential.Bearer(response.accessToken),
+ *             refreshToken = response.refreshToken,
+ *             expiresAtMs = response.expiresAtMs
+ *         )
+ *     }
+ * )
+ *
+ * // Start a session after login
+ * controller.startSession(
+ *     SessionCredentials(credential = Credential.Bearer("eyJ..."))
+ * )
+ *
+ * // Observe state changes
+ * controller.state.collect { state -> updateUi(state) }
+ * ```
+ *
+ * @param store                 Platform-secure storage for persisting credentials.
+ * @param refreshTokenProvider  Optional suspend lambda that exchanges a refresh token
+ *                              for new [SessionCredentials]. Return `null` to signal failure.
+ * @param clock                 Clock function returning epoch millis (injectable for testing).
+ *
+ * @see SessionController
+ */
 class DefaultSessionController(
     private val store: SecretStore,
     private val refreshTokenProvider: (suspend (refreshToken: String) -> SessionCredentials?)? = null,
@@ -28,12 +64,14 @@ class DefaultSessionController(
 
     private val mutex = Mutex()
 
+    /** @see SessionController.startSession */
     override suspend fun startSession(credentials: SessionCredentials): Unit = mutex.withLock {
         persistCredentials(credentials)
         _state.value = SessionState.Active(credentials.credential)
         _events.emit(SessionEvent.Started)
     }
 
+    /** @see SessionController.refreshSession */
     override suspend fun refreshSession(): RefreshOutcome = mutex.withLock {
         val refreshToken = store.getString(KEY_REFRESH_TOKEN)
         val provider = refreshTokenProvider
@@ -77,12 +115,14 @@ class DefaultSessionController(
         }
     }
 
+    /** @see SessionController.endSession */
     override suspend fun endSession(): Unit = mutex.withLock {
         clearPersistedCredentials()
         _state.value = SessionState.Idle
         _events.emit(SessionEvent.Ended)
     }
 
+    /** @see SessionController.invalidate */
     override suspend fun invalidate(): Unit = mutex.withLock {
         clearPersistedCredentials()
         _state.value = SessionState.Idle
@@ -119,4 +159,5 @@ class DefaultSessionController(
     }
 }
 
+/** Platform-specific epoch-millis clock. Implemented per source set (Android / iOS). */
 internal expect fun currentTimeMillis(): Long

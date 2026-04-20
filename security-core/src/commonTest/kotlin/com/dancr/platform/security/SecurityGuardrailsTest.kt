@@ -6,9 +6,16 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-// OWASP MASVS-aligned security guardrail tests.
-// These tests verify that sensitive data is never exposed through toString(),
-// preventing accidental leaks in logs, crash reports, and debuggers.
+/**
+ * OWASP MASVS-aligned security guardrail tests.
+ *
+ * Verifies that sensitive data is **never** exposed through `toString()`,
+ * preventing accidental leaks in logs, crash reports, and debuggers.
+ *
+ * Covers:
+ * - [Credential] subtypes (`Bearer`, `ApiKey`, `Basic`, `Custom`)
+ * - [SessionCredentials] (access + refresh tokens)
+ */
 class SecurityGuardrailsTest {
 
     // -- Credential.toString() redaction (MASVS-STORAGE / MASVS-PRIVACY) --

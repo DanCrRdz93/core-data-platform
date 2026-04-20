@@ -12,6 +12,31 @@ import com.dancr.platform.security.error.SecurityError
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
+/**
+ * Android [SecretStore] implementation using Jetpack DataStore + Android Keystore.
+ *
+ * All values are encrypted with AES-256-GCM via [CryptoManager] before being
+ * persisted to DataStore. Keys are hardware-backed when the device supports it.
+ *
+ * **Example:**
+ * ```kotlin
+ * val store = AndroidSecretStore(
+ *     context = applicationContext,
+ *     config = AndroidStoreConfig(
+ *         dataStoreName = "my_secure_prefs",
+ *         keyAlias = "my_app_key"
+ *     )
+ * )
+ *
+ * store.putString("access_token", "eyJhbG...")
+ * val token = store.getString("access_token") // decrypted value
+ * ```
+ *
+ * @param context The Android application [Context].
+ * @param config  Configuration for DataStore name, key alias, and key prefix.
+ * @see SecretStore
+ * @see CryptoManager
+ */
 class AndroidSecretStore(
     private val context: Context,
     private val config: AndroidStoreConfig = AndroidStoreConfig()

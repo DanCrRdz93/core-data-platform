@@ -11,6 +11,12 @@ import platform.CoreFoundation.CFDataGetLength
 import platform.Foundation.*
 import platform.Security.*
 
+/**
+ * iOS implementation using the Darwin (NSURLSession) engine.
+ *
+ * Configures timeouts from [NetworkConfig] and applies certificate pinning
+ * via `handleChallenge` with `SecTrust` evaluation when a [TrustPolicy] is provided.
+ */
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 internal actual fun createPlatformHttpClient(
     config: NetworkConfig,
@@ -54,8 +60,10 @@ internal actual fun createPlatformHttpClient(
     }
 }
 
-// Result of certificate pin evaluation, decoupled from the NSURLSession
-// completion handler to avoid Int/Long type mismatch in K/N metadata compilation.
+/**
+ * Result of certificate pin evaluation, decoupled from the NSURLSession
+ * completion handler to avoid Int/Long type mismatch in K/N metadata compilation.
+ */
 private sealed class PinEvaluation {
     data class Accepted(val credential: NSURLCredential?) : PinEvaluation()
     data object Rejected : PinEvaluation()
@@ -151,8 +159,12 @@ private fun evaluatePins(
     }
 }
 
-// Pure-Kotlin SHA-256. Avoids platform.CommonCrypto which is not available
-// in iosMain metadata compilation (only in target-specific compilations).
+/**
+ * Pure-Kotlin SHA-256 implementation.
+ *
+ * Avoids `platform.CommonCrypto` which is not available in `iosMain` metadata
+ * compilation (only in target-specific compilations).
+ */
 private fun sha256(input: ByteArray): ByteArray {
     val h = intArrayOf(
         0x6a09e667, -0x44a14782, 0x3c6ef372, -0x5ab00ac1,
