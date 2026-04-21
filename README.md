@@ -1,7 +1,7 @@
 # Core Data Platform
 
-![Version](https://img.shields.io/badge/version-0.3.2-blue)
-![Kotlin](https://img.shields.io/badge/Kotlin-2.1.20-7f52ff)
+![Version](https://img.shields.io/badge/version-0.4.0-blue)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.3.10-7f52ff)
 ![Maven Central](https://img.shields.io/maven-central/v/io.github.dancrrdz93/network-core)
 
 | Módulo | Maven Central |
@@ -112,20 +112,20 @@ repositories {
 
 dependencies {
     // Contratos core (siempre requeridos)
-    implementation("io.github.dancrrdz93:network-core:0.3.2")
+    implementation("io.github.dancrrdz93:network-core:0.4.0")
 
     // Implementación de transporte HTTP (elige uno)
-    implementation("io.github.dancrrdz93:network-ktor:0.3.2")
+    implementation("io.github.dancrrdz93:network-ktor:0.4.0")
 
     // WebSocket (si necesitas conexiones persistentes bidireccionales)
-    implementation("io.github.dancrrdz93:network-ws-core:0.3.2")
-    implementation("io.github.dancrrdz93:network-ws-ktor:0.3.2")
+    implementation("io.github.dancrrdz93:network-ws-core:0.4.0")
+    implementation("io.github.dancrrdz93:network-ws-ktor:0.4.0")
 
     // Seguridad (auth, almacenamiento seguro, gestión de sesiones)
-    implementation("io.github.dancrrdz93:security-core:0.3.2")
+    implementation("io.github.dancrrdz93:security-core:0.4.0")
 
     // Módulo de referencia (opcional — para ver el patrón de integración)
-    implementation("io.github.dancrrdz93:sample-api:0.3.2")
+    implementation("io.github.dancrrdz93:sample-api:0.4.0")
 }
 ```
 
@@ -273,7 +273,7 @@ El 95%+ del código vive en `commonMain`. Solo `SecretStore` (Android Keystore /
 
 | Herramienta | Versión | Notas |
 |---|---|---|
-| **Kotlin** | 2.1.20 | Plugin Kotlin Multiplatform |
+| **Kotlin** | 2.3.10 | Plugin Kotlin Multiplatform |
 | **Gradle** | 9.3.1+ | Con catálogo de versiones (`libs.versions.toml`) |
 | **AGP** | 9.1.0 | Usa plugin `com.android.kotlin.multiplatform.library` |
 | **Android Studio** | Ladybug o posterior | Requiere soporte KMP |
@@ -286,12 +286,12 @@ El 95%+ del código vive en `commonMain`. Solo `SecretStore` (Android Keystore /
 
 | Librería | Versión | Módulo |
 |---|---|---|
-| `kotlinx-coroutines-core` | 1.10.1 | `network-core`, `security-core` |
-| `ktor-client-core` | 3.0.3 | `network-ktor` |
-| `ktor-client-okhttp` | 3.0.3 | `network-ktor` (Android) |
-| `ktor-client-darwin` | 3.0.3 | `network-ktor`, `network-ws-ktor` (iOS) |
-| `ktor-client-websockets` | 3.0.3 | `network-ws-ktor` |
-| `kotlinx-serialization-json` | 1.7.3 | `sample-api` (módulos de dominio) |
+| `kotlinx-coroutines-core` | 1.10.2 | `network-core`, `security-core` |
+| `ktor-client-core` | 3.4.2 | `network-ktor` |
+| `ktor-client-okhttp` | 3.4.2 | `network-ktor` (Android) |
+| `ktor-client-darwin` | 3.4.2 | `network-ktor`, `network-ws-ktor` (iOS) |
+| `ktor-client-websockets` | 3.4.2 | `network-ws-ktor` |
+| `kotlinx-serialization-json` | 1.10.0 | `sample-api` (módulos de dominio) |
 
 ---
 
@@ -355,9 +355,9 @@ Para diagramas de arquitectura, consulta el [índice de diagramas](docs/diagrams
 | `HttpEngine.healthCheck()` — liveness probing (default true, implementado en KtorHttpEngine) | `network-core` / `network-ktor` | ✅ Completado |
 | `SecretStore.keys()` + `putStringIfAbsent()` — migración/diagnóstico y escritura atómica | `security-core` | ✅ Completado |
 | Cleanup de TODOs redundantes — reclasificación de logging/caching/circuit-breaker | Todos | ✅ Completado |
-| Publicación en Maven Central | Todos | ✅ Completado (v0.3.2) |
+| Publicación en Maven Central | Todos | ✅ Completado (v0.4.0) |
 | Política de reintento circuit breaker | `network-core` | 🔴 No iniciado |
-| Soporte WebSocket con reconexión automática | `network-ws-core`, `network-ws-ktor` | ✅ Completado (v0.3.2) |
+| Soporte WebSocket con reconexión automática | `network-ws-core`, `network-ws-ktor` | ✅ Completado (v0.4.0) |
 | Primer módulo de dominio en producción | Nuevo módulo | 🔴 No iniciado |
 
 ---
