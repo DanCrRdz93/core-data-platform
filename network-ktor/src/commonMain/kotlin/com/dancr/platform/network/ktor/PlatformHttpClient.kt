@@ -10,13 +10,13 @@ import io.ktor.client.HttpClient
  * - **Android**: OkHttp engine with `CertificatePinner`
  * - **iOS**: Darwin engine with `handleChallenge` for `SecTrust` evaluation
  *
- * When [trustPolicy] is `null`, no certificate pinning is applied (system default trust).
+ * To opt out of pinning, pass [TrustPolicy.SystemDefault].
  *
  * @param config      Network configuration (timeouts, base URL).
- * @param trustPolicy Optional TLS pinning policy.
+ * @param trustPolicy TLS pinning policy. Use [TrustPolicy.SystemDefault] for no-pinning.
  * @return A platform-configured [HttpClient] instance.
  */
 internal expect fun createPlatformHttpClient(
     config: NetworkConfig,
-    trustPolicy: TrustPolicy?
+    trustPolicy: TrustPolicy
 ): HttpClient

@@ -10,13 +10,13 @@ import io.ktor.client.HttpClient
  * - **Android**: OkHttp engine with `CertificatePinner` + WebSockets plugin
  * - **iOS**: Darwin engine with `handleChallenge` + WebSockets plugin
  *
- * When [trustPolicy] is `null`, no certificate pinning is applied (system default trust).
+ * To opt out of pinning, pass [TrustPolicy.SystemDefault].
  *
  * @param config      WebSocket configuration (URL, timeouts, ping interval).
- * @param trustPolicy Optional TLS pinning policy.
+ * @param trustPolicy TLS pinning policy. Use [TrustPolicy.SystemDefault] for no-pinning.
  * @return A platform-configured [HttpClient] with WebSocket capabilities.
  */
 internal expect fun createPlatformWebSocketClient(
     config: WebSocketConfig,
-    trustPolicy: TrustPolicy?
+    trustPolicy: TrustPolicy
 ): HttpClient

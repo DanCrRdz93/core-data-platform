@@ -15,7 +15,7 @@ import okhttp3.CertificatePinner
  */
 internal actual fun createPlatformHttpClient(
     config: NetworkConfig,
-    trustPolicy: TrustPolicy?
+    trustPolicy: TrustPolicy
 ): HttpClient = HttpClient(OkHttp) {
 
     install(HttpTimeout) {
@@ -26,13 +26,11 @@ internal actual fun createPlatformHttpClient(
 
     expectSuccess = false
 
-    if (trustPolicy != null) {
-        val pins = trustPolicy.pinnedCertificates()
-        if (pins.isNotEmpty()) {
-            engine {
-                config {
-                    certificatePinner(buildCertificatePinner(pins))
-                }
+    val pins = trustPolicy.pinnedCertificates()
+    if (pins.isNotEmpty()) {
+        engine {
+            config {
+                certificatePinner(buildCertificatePinner(pins))
             }
         }
     }

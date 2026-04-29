@@ -63,4 +63,51 @@ data class HttpRequest(
     override fun toString(): String =
         "HttpRequest(method=${method.name}, path=$path, headers=[${headers.keys.joinToString()}], " +
             "queryParams=[${queryParams.keys.joinToString()}], body=${body?.size ?: 0} bytes)"
+
+    companion object {
+        /** `Content-Type: application/json; charset=utf-8`. */
+        const val CONTENT_TYPE_JSON: String = "application/json"
+
+        /** Standard JSON `Accept` + `Content-Type` headers, ready to spread or merge. */
+        val JSON_HEADERS: Map<String, String> = mapOf(
+            "Accept" to CONTENT_TYPE_JSON,
+            "Content-Type" to CONTENT_TYPE_JSON,
+        )
+
+        /**
+         * Builds an [HttpRequest] with `Content-Type: application/json` headers pre-set
+         * and an optional [bodyJson] string body.
+         *
+         * Reduces duplication for typical JSON API calls. Additional [headers] are merged
+         * on top of the JSON defaults (consumer wins on conflict).
+         *
+         * **Example:**
+         * ```kotlin
+         * val req = HttpRequest.json(
+         *     path = "/users",
+         *     method = HttpMethod.POST,
+         *     bodyJson = json.encodeToString(CreateUserDto(name = "Alice")),
+         * )
+         * ```
+         *
+         * @param path        Path relative to the base URL.
+         * @param method      HTTP method (typically POST/PUT/PATCH for write operations).
+         * @param bodyJson    Optional JSON-encoded body.
+         * @param headers     Extra headers to merge on top of the JSON defaults.
+         * @param queryParams Optional query parameters.
+         */
+        fun json(
+            path: String,
+            method: HttpMethod,
+            bodyJson: String? = null,
+            headers: Map<String, String> = emptyMap(),
+            queryParams: Map<String, String> = emptyMap(),
+        ): HttpRequest = HttpRequest(
+            path = path,
+            method = method,
+            headers = JSON_HEADERS + headers,
+            queryParams = queryParams,
+            body = bodyJson?.encodeToByteArray(),
+        )
+    }
 }

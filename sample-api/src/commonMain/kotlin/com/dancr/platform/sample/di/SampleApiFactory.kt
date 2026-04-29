@@ -44,7 +44,7 @@ object SampleApiFactory {
     fun create(
         config: NetworkConfig = defaultConfig,
         credentialProvider: CredentialProvider? = null,
-        trustPolicy: TrustPolicy? = null,
+        trustPolicy: TrustPolicy = TrustPolicy.SystemDefault,
         observers: List<NetworkEventObserver> = emptyList()
     ): UserRepository {
         val engine = KtorHttpEngine.create(config, trustPolicy)
