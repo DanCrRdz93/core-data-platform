@@ -64,25 +64,38 @@ class KtorWebSocketEngine(
     companion object {
 
         /**
-         * Creates a [KtorWebSocketEngine] with platform-appropriate TLS configuration.
+         * Creates a [KtorWebSocketEngine] with the supplied [trustPolicy].
          *
-         * When [trustPolicy] is non-null, certificate pinning is enforced:
-         * - **Android** (OkHttp): via `CertificatePinner`
-         * - **iOS** (Darwin): via `handleChallenge` with `SecTrust` evaluation
-         *
-         * When [trustPolicy] is `null`, system default trust is used (no pinning).
+         * **Breaking change (1.0.0):** [trustPolicy] is now non-nullable. Pass
+         * [TrustPolicy.SystemDefault] for explicit no-pinning, or use the [createPinned]
+         * / [createSystemDefault] factories for clearer intent at the call site.
          *
          * @param config      WebSocket configuration (URL, timeouts, ping interval).
-         * @param trustPolicy Optional TLS pinning policy.
+         * @param trustPolicy TLS pinning policy. Use [TrustPolicy.SystemDefault] for no-pinning.
          * @return A configured [KtorWebSocketEngine] instance.
          */
         fun create(
             config: WebSocketConfig,
-            trustPolicy: TrustPolicy? = null
+            trustPolicy: TrustPolicy,
         ): KtorWebSocketEngine {
             val client = createPlatformWebSocketClient(config, trustPolicy)
             return KtorWebSocketEngine(client)
         }
+
+        /**
+         * Creates a [KtorWebSocketEngine] with **certificate pinning** enforced.
+         */
+        fun createPinned(
+            config: WebSocketConfig,
+            trustPolicy: TrustPolicy,
+        ): KtorWebSocketEngine = create(config, trustPolicy)
+
+        /**
+         * Creates a [KtorWebSocketEngine] using **system-default trust without pinning**.
+         */
+        fun createSystemDefault(
+            config: WebSocketConfig,
+        ): KtorWebSocketEngine = create(config, TrustPolicy.SystemDefault)
     }
 }
 

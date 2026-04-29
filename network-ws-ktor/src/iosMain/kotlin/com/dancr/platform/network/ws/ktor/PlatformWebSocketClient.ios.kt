@@ -21,7 +21,7 @@ import platform.Security.*
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 internal actual fun createPlatformWebSocketClient(
     config: WebSocketConfig,
-    trustPolicy: TrustPolicy?
+    trustPolicy: TrustPolicy
 ): HttpClient = HttpClient(Darwin) {
 
     install(WebSockets) {
@@ -34,26 +34,24 @@ internal actual fun createPlatformWebSocketClient(
 
     expectSuccess = false
 
-    if (trustPolicy != null) {
-        val pins = trustPolicy.pinnedCertificates()
-        if (pins.isNotEmpty()) {
-            engine {
-                @Suppress("ARGUMENT_TYPE_MISMATCH")
-                handleChallenge { _, _, challenge, completionHandler ->
-                    when (val result = evaluatePins(challenge, pins)) {
-                        is PinEvaluation.Accepted -> completionHandler(
-                            NSURLSessionAuthChallengeUseCredential,
-                            result.credential
-                        )
-                        PinEvaluation.Rejected -> completionHandler(
-                            NSURLSessionAuthChallengeCancelAuthenticationChallenge,
-                            null
-                        )
-                        PinEvaluation.DefaultHandling -> completionHandler(
-                            NSURLSessionAuthChallengePerformDefaultHandling,
-                            null
-                        )
-                    }
+    val pins = trustPolicy.pinnedCertificates()
+    if (pins.isNotEmpty()) {
+        engine {
+            @Suppress("ARGUMENT_TYPE_MISMATCH")
+            handleChallenge { _, _, challenge, completionHandler ->
+                when (val result = evaluatePins(challenge, pins)) {
+                    is PinEvaluation.Accepted -> completionHandler(
+                        NSURLSessionAuthChallengeUseCredential,
+                        result.credential
+                    )
+                    PinEvaluation.Rejected -> completionHandler(
+                        NSURLSessionAuthChallengeCancelAuthenticationChallenge,
+                        null
+                    )
+                    PinEvaluation.DefaultHandling -> completionHandler(
+                        NSURLSessionAuthChallengePerformDefaultHandling,
+                        null
+                    )
                 }
             }
         }

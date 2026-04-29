@@ -37,5 +37,20 @@ fun interface NetworkLogger {
     companion object {
         /** No-op logger that silently discards all messages. */
         val NOOP: NetworkLogger = NetworkLogger { _, _, _ -> }
+
+        /**
+         * Multiplatform console logger that writes to standard output via [println].
+         *
+         * Suitable for development, demos, and CLI tooling. Production code should
+         * route through a structured backend (Logcat, OSLog, Crashlytics, etc.).
+         *
+         * **Example:**
+         * ```kotlin
+         * val observer = LoggingObserver(logger = NetworkLogger.Console)
+         * ```
+         */
+        val Console: NetworkLogger = NetworkLogger { level, tag, message ->
+            println("[$level] $tag — $message")
+        }
     }
 }

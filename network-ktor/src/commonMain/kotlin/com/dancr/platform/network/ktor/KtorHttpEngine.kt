@@ -88,25 +88,65 @@ class KtorHttpEngine(
     companion object {
 
         /**
-         * Creates a [KtorHttpEngine] with platform-appropriate TLS configuration.
+         * Creates a [KtorHttpEngine] with the supplied [trustPolicy].
          *
-         * When [trustPolicy] is non-null, certificate pinning is enforced:
-         * - **Android** (OkHttp): via `CertificatePinner`
-         * - **iOS** (Darwin): via `handleChallenge` with `SecTrust` evaluation
-         *
-         * When [trustPolicy] is `null`, system default trust is used (no pinning).
+         * **Breaking change (1.0.0):** [trustPolicy] is now non-nullable. Pass
+         * [TrustPolicy.SystemDefault] for explicit no-pinning, or use the [createPinned]
+         * / [createSystemDefault] factories that document intent at the call site.
          *
          * @param config      Network configuration (base URL, timeouts).
-         * @param trustPolicy Optional TLS pinning policy.
+         * @param trustPolicy TLS pinning policy. Use [TrustPolicy.SystemDefault] for no-pinning
+         *                    or a [DefaultTrustPolicy] with pins for certificate pinning.
          * @return A configured [KtorHttpEngine] instance.
          */
         fun create(
             config: NetworkConfig,
-            trustPolicy: TrustPolicy? = null
+            trustPolicy: TrustPolicy,
         ): KtorHttpEngine {
             val client = createPlatformHttpClient(config, trustPolicy)
             return KtorHttpEngine(client)
         }
+
+        /**
+         * Creates a [KtorHttpEngine] with **certificate pinning** enforced.
+         *
+         * Use this in production code paths where TLS pinning is required:
+         * - Android (OkHttp): pins via `CertificatePinner`.
+         * - iOS (Darwin): pins via `handleChallenge` + `SecTrust`.
+         *
+         * **Example:**
+         * ```kotlin
+         * val policy = DefaultTrustPolicy(
+         *     pins = mapOf(
+         *         "api.example.com" to setOf(
+         *             CertificatePin("sha256", "AAAA…="),
+         *             CertificatePin("sha256", "BBBB…="), // backup pin
+         *         ),
+         *     ),
+         * )
+         * val engine = KtorHttpEngine.createPinned(config, policy)
+         * ```
+         */
+        fun createPinned(
+            config: NetworkConfig,
+            trustPolicy: TrustPolicy,
+        ): KtorHttpEngine = create(config, trustPolicy)
+
+        /**
+         * Creates a [KtorHttpEngine] using **system-default trust without pinning**.
+         *
+         * Use this for development environments, or as an explicit acknowledgement that
+         * pinning is intentionally not configured. Equivalent to passing
+         * [TrustPolicy.SystemDefault] to [create].
+         *
+         * **Example:**
+         * ```kotlin
+         * val engine = KtorHttpEngine.createSystemDefault(NetworkConfig(baseUrl = "https://api.dev"))
+         * ```
+         */
+        fun createSystemDefault(
+            config: NetworkConfig,
+        ): KtorHttpEngine = create(config, TrustPolicy.SystemDefault)
     }
 }
 

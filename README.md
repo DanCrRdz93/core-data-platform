@@ -1,6 +1,6 @@
 # Core Data Platform
 
-![Version](https://img.shields.io/badge/version-0.4.0-blue)
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.3.10-7f52ff)
 ![Maven Central](https://img.shields.io/maven-central/v/io.github.dancrrdz93/network-core)
 
@@ -17,6 +17,8 @@
 
 Una librería Kotlin Multiplatform (KMP) reutilizable y modular diseñada para proveer una base segura, escalable y agnóstica de transporte para operaciones de datos remotos en aplicaciones Android e iOS.
 
+> ⚠️ **Breaking change en `1.0.0`**: `KtorHttpEngine.create(config, trustPolicy)` y `KtorWebSocketEngine.create(config, trustPolicy)` ahora requieren `TrustPolicy` **no-nulo**. Pasa `TrustPolicy.SystemDefault` para confianza del sistema sin pinning, o usa los nuevos factories `createSystemDefault(config)` / `createPinned(config, policy)`. Ver [Changelog](#changelog).
+
 ---
 
 ## Tabla de Contenidos
@@ -32,6 +34,7 @@ Una librería Kotlin Multiplatform (KMP) reutilizable y modular diseñada para p
 - [Roadmap](#roadmap)
 - [Seguridad — OWASP MASVS](#seguridad--owasp-masvs)
 - [Reglas de Diseño](#reglas-de-diseño)
+- [Changelog](#changelog)
 
 ---
 
@@ -78,24 +81,41 @@ Una librería Kotlin Multiplatform (KMP) reutilizable y modular diseñada para p
 ## Quick Start
 
 ```kotlin
-// 1. Crea el repository (configuración por defecto incluida)
-val repository = SampleApiFactory.create()
+// 1. Crea el HTTP engine — la elección del TrustPolicy es explícita.
+val engine = KtorHttpEngine.createSystemDefault(
+    NetworkConfig(baseUrl = "https://api.example.com")
+)
+// …o, en producción con pinning:
+// val engine = KtorHttpEngine.createPinned(
+//     config = NetworkConfig(baseUrl = "https://api.example.com"),
+//     trustPolicy = DefaultTrustPolicy(
+//         pins = mapOf("api.example.com" to setOf(
+//             CertificatePin("sha256", "AAAA…="),
+//             CertificatePin("sha256", "BBBB…="), // backup
+//         )),
+//     ),
+// )
 
-// 2. Llama un endpoint
+// 2. Construye un request JSON sin repetir headers.
+val request = HttpRequest.json(
+    path = "/users",
+    method = HttpMethod.POST,
+    bodyJson = """{"name":"Alice"}""",
+)
+
+// 3. (O usa el sample-api de referencia)
+val repository = SampleApiFactory.create()
 val result: NetworkResult<List<User>> = repository.getUsers()
 
-// 3. Maneja el resultado
 result.fold(
-    onSuccess = { users ->
-        users.forEach { println("${it.displayName} (@${it.handle})") }
-    },
-    onFailure = { error ->
-        println("Error: ${error.message}")
-    }
+    onSuccess = { users -> users.forEach { println("${it.displayName} (@${it.handle})") } },
+    onFailure = { error -> println("Error: ${error.message}") },
 )
 ```
 
 > `SampleApiFactory.create()` ensambla internamente todo el pipeline: configuración → engine HTTP → executor con reintentos → data source → repository. Tú solo interactúas con `UserRepository` y `NetworkResult<User>`.
+
+> Para observabilidad rápida en desarrollo, instala `LoggingObserver(logger = NetworkLogger.Console)`.
 
 Para configuración avanzada (auth, timeouts personalizados, interceptors), consulta la [Guía de Integración](docs/integration-guide.md) o las guías rápidas para [Android](docs/android-quickstart.md) / [iOS](docs/ios-quickstart.md).
 
@@ -112,20 +132,20 @@ repositories {
 
 dependencies {
     // Contratos core (siempre requeridos)
-    implementation("io.github.dancrrdz93:network-core:0.4.0")
+    implementation("io.github.dancrrdz93:network-core:1.0.0")
 
     // Implementación de transporte HTTP (elige uno)
-    implementation("io.github.dancrrdz93:network-ktor:0.4.0")
+    implementation("io.github.dancrrdz93:network-ktor:1.0.0")
 
     // WebSocket (si necesitas conexiones persistentes bidireccionales)
-    implementation("io.github.dancrrdz93:network-ws-core:0.4.0")
-    implementation("io.github.dancrrdz93:network-ws-ktor:0.4.0")
+    implementation("io.github.dancrrdz93:network-ws-core:1.0.0")
+    implementation("io.github.dancrrdz93:network-ws-ktor:1.0.0")
 
     // Seguridad (auth, almacenamiento seguro, gestión de sesiones)
-    implementation("io.github.dancrrdz93:security-core:0.4.0")
+    implementation("io.github.dancrrdz93:security-core:1.0.0")
 
     // Módulo de referencia (opcional — para ver el patrón de integración)
-    implementation("io.github.dancrrdz93:sample-api:0.4.0")
+    implementation("io.github.dancrrdz93:sample-api:1.0.0")
 }
 ```
 
@@ -358,6 +378,8 @@ Para diagramas de arquitectura, consulta el [índice de diagramas](docs/diagrams
 | Publicación en Maven Central | Todos | ✅ Completado (v0.4.0) |
 | Política de reintento circuit breaker | `network-core` | 🔴 No iniciado |
 | Soporte WebSocket con reconexión automática | `network-ws-core`, `network-ws-ktor` | ✅ Completado (v0.4.0) |
+| `TrustPolicy` no-nulo + factories `createPinned`/`createSystemDefault` | `network-ktor`, `network-ws-ktor` | ✅ Completado (v1.0.0) |
+| `HttpRequest.json(...)` + `JSON_HEADERS` + `NetworkLogger.Console` | `network-core` | ✅ Completado (v1.0.0) |
 | Primer módulo de dominio en producción | Nuevo módulo | 🔴 No iniciado |
 
 ---
@@ -418,6 +440,20 @@ Estas son las invariantes arquitectónicas del proyecto. Todas las contribucione
 
 10. **Las nuevas funcionalidades son aditivas.**
     Nuevos módulos, nuevos interceptors, nuevos observers, nuevos subtipos de error. Los contratos existentes son estables.
+
+---
+
+## Changelog
+
+| Versión | Fecha | Cambios |
+|---|---|---|
+| **1.0.0** | 2026-04-29 | **Compromiso de estabilidad SemVer 1.x.** **Breaking:** `KtorHttpEngine.create(config, trustPolicy: TrustPolicy)` y `KtorWebSocketEngine.create(...)` ahora requieren `TrustPolicy` **no-nulo** (antes era `TrustPolicy? = null`). Migración: pasa `TrustPolicy.SystemDefault` cuando no necesites pinning, o usa los nuevos factories `createSystemDefault(config)` / `createPinned(config, policy)`. **Aditivo:** nuevo `TrustPolicy.SystemDefault`, `NetworkLogger.Console` (logger println KMP), `HttpRequest.json(...)` + `HttpRequest.JSON_HEADERS` para reducir duplicación, factories `createPinned`/`createSystemDefault` en `KtorHttpEngine` y `KtorWebSocketEngine`. `SampleApiFactory.create(...)` actualiza `trustPolicy` a default `TrustPolicy.SystemDefault`. |
+| **0.4.0** | 2026-04-13 | Bump a Kotlin 2.3.10. Publicación a Maven Central de los seis módulos. KDoc completa en todas las APIs públicas. |
+| **0.3.2** | — | Documentación KDoc en source files. |
+| **0.3.1** | — | Per-module Maven Central badges, alineación de versiones. |
+| **0.3.0** | — | Soporte de WebSocket: `network-ws-core`, `network-ws-ktor`. |
+| **0.2.x** | — | Cancelación correcta, observabilidad (Logging/Metrics/Tracing), bounds check de crypto. |
+| **0.1.x** | — | Configuración de publicación en Maven Central. |
 
 ---
 

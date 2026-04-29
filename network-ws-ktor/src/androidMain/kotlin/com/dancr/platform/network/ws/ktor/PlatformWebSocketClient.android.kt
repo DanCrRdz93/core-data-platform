@@ -16,7 +16,7 @@ import okhttp3.CertificatePinner
  */
 internal actual fun createPlatformWebSocketClient(
     config: WebSocketConfig,
-    trustPolicy: TrustPolicy?
+    trustPolicy: TrustPolicy
 ): HttpClient = HttpClient(OkHttp) {
 
     install(WebSockets) {
@@ -29,13 +29,11 @@ internal actual fun createPlatformWebSocketClient(
 
     expectSuccess = false
 
-    if (trustPolicy != null) {
-        val pins = trustPolicy.pinnedCertificates()
-        if (pins.isNotEmpty()) {
-            engine {
-                config {
-                    certificatePinner(buildCertificatePinner(pins))
-                }
+    val pins = trustPolicy.pinnedCertificates()
+    if (pins.isNotEmpty()) {
+        engine {
+            config {
+                certificatePinner(buildCertificatePinner(pins))
             }
         }
     }

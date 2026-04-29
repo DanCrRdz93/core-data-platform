@@ -20,7 +20,7 @@ import platform.Security.*
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 internal actual fun createPlatformHttpClient(
     config: NetworkConfig,
-    trustPolicy: TrustPolicy?
+    trustPolicy: TrustPolicy
 ): HttpClient = HttpClient(Darwin) {
 
     install(HttpTimeout) {
@@ -31,29 +31,27 @@ internal actual fun createPlatformHttpClient(
 
     expectSuccess = false
 
-    if (trustPolicy != null) {
-        val pins = trustPolicy.pinnedCertificates()
-        if (pins.isNotEmpty()) {
-            engine {
-                // @Suppress needed: NSURLSessionAuthChallengeDisposition is Int in
-                // iosMain metadata compilation but Long in target compilations (K/N
-                // hierarchical source set limitation).
-                @Suppress("ARGUMENT_TYPE_MISMATCH")
-                handleChallenge { _, _, challenge, completionHandler ->
-                    when (val result = evaluatePins(challenge, pins)) {
-                        is PinEvaluation.Accepted -> completionHandler(
-                            NSURLSessionAuthChallengeUseCredential,
-                            result.credential
-                        )
-                        PinEvaluation.Rejected -> completionHandler(
-                            NSURLSessionAuthChallengeCancelAuthenticationChallenge,
-                            null
-                        )
-                        PinEvaluation.DefaultHandling -> completionHandler(
-                            NSURLSessionAuthChallengePerformDefaultHandling,
-                            null
-                        )
-                    }
+    val pins = trustPolicy.pinnedCertificates()
+    if (pins.isNotEmpty()) {
+        engine {
+            // @Suppress needed: NSURLSessionAuthChallengeDisposition is Int in
+            // iosMain metadata compilation but Long in target compilations (K/N
+            // hierarchical source set limitation).
+            @Suppress("ARGUMENT_TYPE_MISMATCH")
+            handleChallenge { _, _, challenge, completionHandler ->
+                when (val result = evaluatePins(challenge, pins)) {
+                    is PinEvaluation.Accepted -> completionHandler(
+                        NSURLSessionAuthChallengeUseCredential,
+                        result.credential
+                    )
+                    PinEvaluation.Rejected -> completionHandler(
+                        NSURLSessionAuthChallengeCancelAuthenticationChallenge,
+                        null
+                    )
+                    PinEvaluation.DefaultHandling -> completionHandler(
+                        NSURLSessionAuthChallengePerformDefaultHandling,
+                        null
+                    )
                 }
             }
         }

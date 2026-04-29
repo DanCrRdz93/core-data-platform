@@ -41,4 +41,25 @@ interface TrustPolicy {
      * @return Map of hostname → set of [CertificatePin]. Empty map means no pinning.
      */
     fun pinnedCertificates(): Map<String, Set<CertificatePin>>
+
+    companion object {
+        /**
+         * Sentinel policy that opts into system-default trust with **no pinning**.
+         *
+         * Use this to make the absence of certificate pinning an explicit, auditable
+         * decision in `KtorHttpEngine.createSystemDefault(...)` or `create(..., trustPolicy)`,
+         * rather than passing `null`.
+         *
+         * Production deployments handling sensitive data should prefer
+         * [DefaultTrustPolicy] with concrete [CertificatePin] entries.
+         *
+         * **Example:**
+         * ```kotlin
+         * val engine = KtorHttpEngine.createSystemDefault(config)
+         * // equivalent to:
+         * val engine = KtorHttpEngine.create(config, TrustPolicy.SystemDefault)
+         * ```
+         */
+        val SystemDefault: TrustPolicy = DefaultTrustPolicy()
+    }
 }
