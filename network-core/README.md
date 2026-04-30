@@ -172,7 +172,9 @@ network-core/src/commonMain/kotlin/com/dancr/platform/network/
 │   ├── DefaultErrorClassifier.kt   # Clasificador heurístico (clase open)
 │   ├── ResponseValidator.kt        # Interfaz + sealed class ValidationOutcome
 │   ├── DefaultResponseValidator.kt # Por defecto: 2xx = Valid
-│   └── RequestContext.kt           # Metadata por request (operationId, tags, tracing)
+│   ├── RequestContext.kt           # Metadata por request (operationId, tags, tracing)
+│   ├── Refresher.kt                # fun interface — hook genérico para recuperar de 401
+│   └── RefreshingSafeRequestExecutor.kt  # Decorador opcional — auto-retry con refresh
 │
 ├── observability/                  # Hooks de observabilidad
 │   ├── NetworkEventObserver.kt     # Callbacks de ciclo de vida con default no-op

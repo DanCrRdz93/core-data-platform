@@ -61,9 +61,9 @@ El SDK está publicado en **Maven Central**. Agrega las dependencias en tu `buil
 ```kotlin
 // build.gradle.kts de tu módulo de dominio
 dependencies {
-    implementation("io.github.dancrrdz93:network-core:0.2.0")
-    implementation("io.github.dancrrdz93:network-ktor:0.2.0")
-    implementation("io.github.dancrrdz93:security-core:0.2.0")
+    implementation("io.github.dancrrdz93:network-core:1.1.0")
+    implementation("io.github.dancrrdz93:network-ktor:1.1.0")
+    implementation("io.github.dancrrdz93:security-core:1.1.0")
 }
 ```
 
@@ -104,9 +104,9 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // Módulos del SDK (Maven Central)
-            implementation("io.github.dancrrdz93:network-core:0.2.0")
-            implementation("io.github.dancrrdz93:network-ktor:0.2.0")
-            implementation("io.github.dancrrdz93:security-core:0.2.0")
+            implementation("io.github.dancrrdz93:network-core:1.1.0")
+            implementation("io.github.dancrrdz93:network-ktor:1.1.0")
+            implementation("io.github.dancrrdz93:security-core:1.1.0")
 
             // Requerido para coroutines
             implementation(libs.kotlinx.coroutines.core)

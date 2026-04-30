@@ -31,9 +31,9 @@ Tú solo interactúas con **repositorios** que devuelven modelos de dominio limp
 │  • IosSecretStore para almacenamiento seguro    │
 ├─────────────────────────────────────────────────┤
 │  Core Data Platform SDK (Maven Central / KMP)   │
-│  io.github.dancrrdz93:network-core:0.2.0       │
-│  io.github.dancrrdz93:network-ktor:0.2.0       │
-│  io.github.dancrrdz93:security-core:0.2.0      │
+│  io.github.dancrrdz93:network-core:1.1.0       │
+│  io.github.dancrrdz93:network-ktor:1.1.0       │
+│  io.github.dancrrdz93:security-core:1.1.0      │
 └─────────────────────────────────────────────────┘
 ```
 

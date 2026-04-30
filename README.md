@@ -132,20 +132,20 @@ repositories {
 
 dependencies {
     // Contratos core (siempre requeridos)
-    implementation("io.github.dancrrdz93:network-core:1.0.0")
+    implementation("io.github.dancrrdz93:network-core:1.1.0")
 
     // Implementación de transporte HTTP (elige uno)
-    implementation("io.github.dancrrdz93:network-ktor:1.0.0")
+    implementation("io.github.dancrrdz93:network-ktor:1.1.0")
 
     // WebSocket (si necesitas conexiones persistentes bidireccionales)
-    implementation("io.github.dancrrdz93:network-ws-core:1.0.0")
-    implementation("io.github.dancrrdz93:network-ws-ktor:1.0.0")
+    implementation("io.github.dancrrdz93:network-ws-core:1.1.0")
+    implementation("io.github.dancrrdz93:network-ws-ktor:1.1.0")
 
     // Seguridad (auth, almacenamiento seguro, gestión de sesiones)
-    implementation("io.github.dancrrdz93:security-core:1.0.0")
+    implementation("io.github.dancrrdz93:security-core:1.1.0")
 
     // Módulo de referencia (opcional — para ver el patrón de integración)
-    implementation("io.github.dancrrdz93:sample-api:1.0.0")
+    implementation("io.github.dancrrdz93:sample-api:1.1.0")
 }
 ```
 
@@ -380,6 +380,7 @@ Para diagramas de arquitectura, consulta el [índice de diagramas](docs/diagrams
 | Soporte WebSocket con reconexión automática | `network-ws-core`, `network-ws-ktor` | ✅ Completado (v0.4.0) |
 | `TrustPolicy` no-nulo + factories `createPinned`/`createSystemDefault` | `network-ktor`, `network-ws-ktor` | ✅ Completado (v1.0.0) |
 | `HttpRequest.json(...)` + `JSON_HEADERS` + `NetworkLogger.Console` | `network-core` | ✅ Completado (v1.0.0) |
+| `Refresher` + `RefreshingSafeRequestExecutor` — recuperación transparente de 401 con reintento único | `network-core` | ✅ Completado (v1.1.0) |
 | Primer módulo de dominio en producción | Nuevo módulo | 🔴 No iniciado |
 
 ---
