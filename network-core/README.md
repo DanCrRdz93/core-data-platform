@@ -358,6 +358,39 @@ Output de ejemplo:
 [MyApp] ERROR: FAILED GET /orders (5023ms) — The request timed out
 ```
 
+### Refresh on 401 con `RefreshingSafeRequestExecutor`
+
+`RefreshingSafeRequestExecutor` es un decorador opcional sobre cualquier `SafeRequestExecutor`. Si la primera llamada falla con `NetworkError.Authentication` (HTTP 401), invoca un `Refresher` y — si reporta éxito — reintenta el request una vez. La interfaz `Refresher` es genérica para no acoplar `network-core` a `security-core`; el consumidor decide cómo refrescar.
+
+```kotlin
+import com.dancr.platform.network.execution.DefaultSafeRequestExecutor
+import com.dancr.platform.network.execution.Refresher
+import com.dancr.platform.network.execution.RefreshingSafeRequestExecutor
+
+// 1. Tu executor base, con interceptor que adjunta Authorization desde la sesión actual.
+val baseExecutor = DefaultSafeRequestExecutor(
+    engine = myEngine,
+    config = config,
+    interceptors = listOf(authInterceptor),
+    observers = listOf(loggingObserver),
+)
+
+// 2. Puente al CredentialProvider de security-core (o tu propio refresher).
+val refresher = Refresher { credentialProvider.refresh() != null }
+
+// 3. Envuelve el executor.
+val executor: SafeRequestExecutor = RefreshingSafeRequestExecutor(baseExecutor, refresher)
+```
+
+**Importante:** el flujo de refresh (la llamada al endpoint que canjea el refresh token por uno nuevo) **debe usar un executor separado**, sin auth interceptor y sin este decorador. De otro modo, un refresh fallido dispararía recursivamente otro refresh.
+
+Comportamiento:
+
+- Primera llamada: pasa por el `delegate` tal cual.
+- Si retorna `Failure(NetworkError.Authentication)` y el `refresher` retorna `true` → reintenta una vez y retorna ese resultado (incluso si vuelve a ser 401).
+- Si el `refresher` retorna `false` (refresh token vencido, sin red, etc.) → propaga la falla original sin reintentar.
+- Cualquier otra falla pasa sin tocar.
+
 **Límites importantes:**
 - **El backend de logging lo define el consumidor.** `NetworkLogger.NOOP` es el default.
 - **Siempre sanitiza en producción.** El parámetro `headerSanitizer` redacta valores antes de loggear. Conecta `DefaultLogSanitizer` de `:security-core`.

@@ -1,6 +1,6 @@
 # Core Data Platform
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.3.10-7f52ff)
 ![Maven Central](https://img.shields.io/maven-central/v/io.github.dancrrdz93/network-core)
 
@@ -447,6 +447,7 @@ Estas son las invariantes arquitectónicas del proyecto. Todas las contribucione
 
 | Versión | Fecha | Cambios |
 |---|---|---|
+| **1.1.0** | 2026-04-30 | **Aditivo (no-breaking):** nuevo `Refresher` (fun interface en `network-core/execution`) y nuevo decorador `RefreshingSafeRequestExecutor`. Permite que un `SafeRequestExecutor` recupere automáticamente de un `NetworkError.Authentication` (HTTP 401): invoca el `Refresher` y, si retorna `true`, reintenta el request una vez. El hook se mantiene genérico para no acoplar `network-core` a `security-core` — el consumidor puentea típicamente con `Refresher { credentialProvider.refresh() != null }`. La refresh request debe ir por un executor separado para evitar recursión. |
 | **1.0.0** | 2026-04-29 | **Compromiso de estabilidad SemVer 1.x.** **Breaking:** `KtorHttpEngine.create(config, trustPolicy: TrustPolicy)` y `KtorWebSocketEngine.create(...)` ahora requieren `TrustPolicy` **no-nulo** (antes era `TrustPolicy? = null`). Migración: pasa `TrustPolicy.SystemDefault` cuando no necesites pinning, o usa los nuevos factories `createSystemDefault(config)` / `createPinned(config, policy)`. **Aditivo:** nuevo `TrustPolicy.SystemDefault`, `NetworkLogger.Console` (logger println KMP), `HttpRequest.json(...)` + `HttpRequest.JSON_HEADERS` para reducir duplicación, factories `createPinned`/`createSystemDefault` en `KtorHttpEngine` y `KtorWebSocketEngine`. `SampleApiFactory.create(...)` actualiza `trustPolicy` a default `TrustPolicy.SystemDefault`. |
 | **0.4.0** | 2026-04-13 | Bump a Kotlin 2.3.10. Publicación a Maven Central de los seis módulos. KDoc completa en todas las APIs públicas. |
 | **0.3.2** | — | Documentación KDoc en source files. |
